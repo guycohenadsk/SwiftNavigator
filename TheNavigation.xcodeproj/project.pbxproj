@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		6C7E41AF61ABA608F9FA3179 /* AppComposition in Frameworks */ = {isa = PBXBuildFile; productRef = B80DD9CE3EA96CA823E2B393 /* AppComposition */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		017EF7B7304C90E90012BA18 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,7 @@
 		017EF7A0304C90E60012BA18 /* TheNavigation.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TheNavigation.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		017EF7B6304C90E90012BA18 /* TheNavigationTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TheNavigationTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		017EF7C0304C90E90012BA18 /* TheNavigationUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TheNavigationUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		017EF7D4304C91C40012BA18 /* MyLibrary */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = MyLibrary; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -65,6 +70,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6C7E41AF61ABA608F9FA3179 /* AppComposition in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -88,6 +94,7 @@
 		017EF797304C90E60012BA18 = {
 			isa = PBXGroup;
 			children = (
+				017EF7D4304C91C40012BA18 /* MyLibrary */,
 				017EF7A2304C90E60012BA18 /* TheNavigation */,
 				017EF7B9304C90E90012BA18 /* TheNavigationTests */,
 				017EF7C3304C90E90012BA18 /* TheNavigationUITests */,
@@ -125,6 +132,7 @@
 			);
 			name = TheNavigation;
 			packageProductDependencies = (
+				B80DD9CE3EA96CA823E2B393 /* AppComposition */,
 			);
 			productName = TheNavigation;
 			productReference = 017EF7A0304C90E60012BA18 /* TheNavigation.app */;
@@ -208,6 +216,9 @@
 			);
 			mainGroup = 017EF797304C90E60012BA18;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "NavigationKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 017EF7A1304C90E60012BA18 /* Products */;
 			projectDirPath = "";
@@ -294,7 +305,6 @@
 				INFOPLIST_FILE = TheNavigation/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -326,7 +336,6 @@
 				INFOPLIST_FILE = TheNavigation/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -591,6 +600,21 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "NavigationKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = NavigationKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B80DD9CE3EA96CA823E2B393 /* AppComposition */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "NavigationKit" */;
+			productName = AppComposition;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 017EF798304C90E60012BA18 /* Project object */;
 }
