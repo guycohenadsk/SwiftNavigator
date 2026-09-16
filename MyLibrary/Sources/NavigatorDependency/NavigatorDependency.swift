@@ -15,8 +15,8 @@ private enum NavigatorKey: DependencyKey {
 
 /// Installed only if AppComposition forgets to call `prepareDependencies` at startup.
 private struct UnimplementedNavigator: Navigator {
-    func push(_ route: Route) {
-        assertionFailure("Navigated to \(route) before AppComposition installed a live Navigator.")
+    func push(_ destination: Destination) {
+        assertionFailure("Navigated to \(destination) before AppComposition installed a live Navigator.")
     }
 
     func pop() {
@@ -27,8 +27,8 @@ private struct UnimplementedNavigator: Navigator {
         assertionFailure("Popped to root before AppComposition installed a live Navigator.")
     }
 
-    func present(_ route: Route) {
-        assertionFailure("Presented \(route) before AppComposition installed a live Navigator.")
+    func present(_ destination: Destination) {
+        assertionFailure("Presented \(destination) before AppComposition installed a live Navigator.")
     }
 
     func dismiss() {

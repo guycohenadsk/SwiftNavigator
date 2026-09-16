@@ -1,10 +1,12 @@
 import AppRoutes
 import ComposableArchitecture
+import NavigatorDependency
 import SwiftUI
 
 public struct ScreenAView: View {
     let store: StoreOf<ScreenAFeature>
     @State private var isShowingInfo = false
+    @Dependency(\.navigator) var navigator
 
     public init(store: StoreOf<ScreenAFeature>) {
         self.store = store
@@ -19,6 +21,20 @@ public struct ScreenAView: View {
             Section("Within this module") {
                 Button("Push to Screen A2") {
                     store.send(.pushScreenA2Tapped)
+                }
+            }
+            Section("Cross-module delegate") {
+                Button("Push Screen C with context") {
+                    // View-owned delegate: the push bypasses the reducer, and outputs re-enter
+                    // the system through Store.send, which — unlike an effect's Send — has no
+                    // lifetime to outlive.
+                    navigator.push(.screenC(ScreenCContext(
+                        subtitle: "I have been pushed from Screen A",
+                        output: { store.send(.screenC($0)) }
+                    )))
+                }
+                if let text = store.screenCText {
+                    LabeledContent("Screen C sent", value: text)
                 }
             }
             Section("Navigate to") {

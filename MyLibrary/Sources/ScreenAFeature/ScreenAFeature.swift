@@ -7,6 +7,7 @@ public struct ScreenAFeature {
     @ObservableState
     public struct State: Equatable {
         @Presents public var screenA2: ScreenA2Feature.State?
+        public var screenCText: String?
 
         public init() {}
     }
@@ -16,6 +17,7 @@ public struct ScreenAFeature {
         case presentButtonTapped(Route)
         case pushScreenA2Tapped
         case screenA2(PresentationAction<ScreenA2Feature.Action>)
+        case screenC(ScreenCOutput)
     }
 
     @Dependency(\.navigator) var navigator
@@ -35,6 +37,9 @@ public struct ScreenAFeature {
                 state.screenA2 = ScreenA2Feature.State()
                 return .none
             case .screenA2:
+                return .none
+            case let .screenC(.textSubmitted(text)):
+                state.screenCText = text
                 return .none
             }
         }

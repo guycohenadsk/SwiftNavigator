@@ -18,7 +18,7 @@ enum AppComposition {
         tabBarController.viewControllers = [
             makeTab(root: .screenA, path: \.pathA, navigator: navigator, title: "Screen A", systemImage: "a.circle"),
             makeTab(root: .screenB, path: \.pathB, navigator: navigator, title: "Screen B", systemImage: "b.circle"),
-            makeTab(root: .screenC, path: \.pathC, navigator: navigator, title: "Screen C", systemImage: "c.circle"),
+            makeTab(root: .screenC(), path: \.pathC, navigator: navigator, title: "Screen C", systemImage: "c.circle"),
             makeTab(root: .screenD, path: \.pathD, navigator: navigator, title: "Screen D", systemImage: "d.circle"),
         ]
 
@@ -33,12 +33,12 @@ enum AppComposition {
         viewController.present(item: UIBindable(host).presented) { presented in
             let stack = NavigationStackController(path: UIBindable(presented).path) {
                 withDependencies { $0.navigator = presented } operation: {
-                    ScreenResolver.viewController(for: presented.route, navigator: presented)
+                    ScreenResolver.viewController(for: presented.destination, navigator: presented)
                 }
             }
-            stack.navigationDestination(for: Route.self) { route in
+            stack.navigationDestination(for: RouteEntry.self) { entry in
                 withDependencies { $0.navigator = presented } operation: {
-                    ScreenResolver.viewController(for: route, navigator: presented)
+                    ScreenResolver.viewController(for: entry.destination, navigator: presented)
                 }
             }
             attachPresentation(on: stack, host: presented)
@@ -47,8 +47,8 @@ enum AppComposition {
     }
 
     private static func makeTab(
-        root: Route,
-        path: ReferenceWritableKeyPath<AppNavigator, [Route]>,
+        root: Destination,
+        path: ReferenceWritableKeyPath<AppNavigator, [RouteEntry]>,
         navigator: AppNavigator,
         title: String,
         systemImage: String
@@ -57,8 +57,8 @@ enum AppComposition {
         let stack = NavigationStackController(path: pathBinding) {
             ScreenResolver.viewController(for: root, navigator: navigator)
         }
-        stack.navigationDestination(for: Route.self) { route in
-            ScreenResolver.viewController(for: route, navigator: navigator)
+        stack.navigationDestination(for: RouteEntry.self) { entry in
+            ScreenResolver.viewController(for: entry.destination, navigator: navigator)
         }
         stack.tabBarItem = UITabBarItem(title: title, image: UIImage(systemName: systemImage), tag: 0)
         return stack
