@@ -1,15 +1,16 @@
 import AppRoutes
 import ComposableArchitecture
+import NavigatorDependency
 import Observation
 import SwiftNavigation
 import UIKit
 import UIKitNavigation
 
-/// Builds the app's root view controller. This is the only public entry point the app target
+/// Builds the app's root view controller. This is the only entry point the app target
 /// needs — everything about how navigation is wired lives behind it.
 @MainActor
-public enum AppComposition {
-    public static func makeRootViewController() -> UIViewController {
+enum AppComposition {
+    static func makeRootViewController() -> UIViewController {
         let navigator = AppNavigator()
         prepareDependencies { $0.navigator = navigator }
 

@@ -1,4 +1,3 @@
-import AppComposition
 import UIKit
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
