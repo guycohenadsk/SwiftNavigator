@@ -2,7 +2,7 @@ import AppRoutes
 import Foundation
 import Observation
 
-/// Something that can host a modally-presented `Route` on top of itself. Implemented by both
+/// Something that can host a modally-presented destination on top of itself. Implemented by both
 /// `AppNavigator` (the tab-bar level) and `PresentedNavigator` (each modal level), so presenting
 /// while already presenting simply grows the chain instead of replacing it.
 @MainActor
@@ -11,13 +11,14 @@ protocol PresentationHost: AnyObject {
 }
 
 extension PresentationHost {
-    /// Presents `route` on top of whichever level is currently innermost, so calling `present`
-    /// again while something is already presented stacks a new modal rather than replacing it.
-    func present(_ route: Route) {
+    /// Presents `destination` on top of whichever level is currently innermost, so calling
+    /// `present` again while something is already presented stacks a new modal rather than
+    /// replacing it.
+    func present(_ destination: Destination) {
         if let presented {
-            presented.present(route)
+            presented.present(destination)
         } else {
-            presented = PresentedNavigator(route: route)
+            presented = PresentedNavigator(destination: destination)
         }
     }
 
@@ -31,22 +32,22 @@ extension PresentationHost {
     }
 }
 
-/// One level of modal presentation: the route it was presented with, its own backstack, and
+/// One level of modal presentation: the destination it was presented with, its own backstack, and
 /// optionally another `PresentedNavigator` presented on top of it.
 @MainActor
 @Observable
 final class PresentedNavigator: Navigator, PresentationHost, @unchecked Sendable, Identifiable {
     let id = UUID()
-    let route: Route
-    var path: [Route] = []
+    let destination: Destination
+    var path: [RouteEntry] = []
     var presented: PresentedNavigator?
 
-    init(route: Route) {
-        self.route = route
+    init(destination: Destination) {
+        self.destination = destination
     }
 
-    func push(_ route: Route) {
-        if let presented { presented.push(route) } else { path.append(route) }
+    func push(_ destination: Destination) {
+        if let presented { presented.push(destination) } else { path.append(RouteEntry(destination: destination)) }
     }
 
     func pop() {
@@ -59,28 +60,29 @@ final class PresentedNavigator: Navigator, PresentationHost, @unchecked Sendable
 }
 
 /// Owns one backstack per tab and mutates whichever tab is currently selected. This is the only
-/// piece of the whole system that knows navigation is implemented as four arrays of `Route`.
+/// piece of the whole system that knows navigation is implemented as four arrays of `RouteEntry`.
 @MainActor
 @Observable
 final class AppNavigator: Navigator, PresentationHost, @unchecked Sendable {
     var tabIndex = 0
-    var pathA: [Route] = []
-    var pathB: [Route] = []
-    var pathC: [Route] = []
-    var pathD: [Route] = []
+    var pathA: [RouteEntry] = []
+    var pathB: [RouteEntry] = []
+    var pathC: [RouteEntry] = []
+    var pathD: [RouteEntry] = []
 
     var presented: PresentedNavigator?
 
-    func push(_ route: Route) {
+    func push(_ destination: Destination) {
         if let presented {
-            presented.push(route)
+            presented.push(destination)
             return
         }
+        let entry = RouteEntry(destination: destination)
         switch tabIndex {
-        case 0: pathA.append(route)
-        case 1: pathB.append(route)
-        case 2: pathC.append(route)
-        default: pathD.append(route)
+        case 0: pathA.append(entry)
+        case 1: pathB.append(entry)
+        case 2: pathC.append(entry)
+        default: pathD.append(entry)
         }
     }
 

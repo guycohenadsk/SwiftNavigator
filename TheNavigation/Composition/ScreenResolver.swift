@@ -6,18 +6,18 @@ import ScreenCKit
 import ScreenDKit
 import UIKit
 
-/// The one place in the app that knows about every feature module. Turns an opaque `Route` into
-/// a concrete screen, whatever technology that screen happens to be built with.
+/// The one place in the app that knows about every feature module. Turns an opaque `Destination`
+/// into a concrete screen, whatever technology that screen happens to be built with.
 @MainActor
 enum ScreenResolver {
-    static func viewController(for route: Route, navigator: Navigator) -> UIViewController {
-        switch route {
+    static func viewController(for destination: Destination, navigator: Navigator) -> UIViewController {
+        switch destination {
         case .screenA:
             ScreenAHostingController(store: Store(initialState: ScreenAFeature.State()) { ScreenAFeature() })
         case .screenB:
             ScreenBHostingController(store: Store(initialState: ScreenBFeature.State()) { ScreenBFeature() })
-        case .screenC:
-            ScreenCViewController(navigator: navigator)
+        case let .screenC(context):
+            ScreenCViewController(navigator: navigator, context: context)
         case .screenD:
             ScreenDViewController(navigator: navigator)
         }
