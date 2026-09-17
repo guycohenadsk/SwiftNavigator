@@ -7,7 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		6C7E41AF61ABA608F9FA3179 /* AppComposition in Frameworks */ = {isa = PBXBuildFile; productRef = B80DD9CE3EA96CA823E2B393 /* AppComposition */; };
+		EE46ABC71F014361A40244B3 /* AppRoutes in Frameworks */ = {isa = PBXBuildFile; productRef = 5C96AEA950D34958B5BF197A /* AppRoutes */; };
+		C49EACA179CF4067B9A65DB7 /* NavigatorDependency in Frameworks */ = {isa = PBXBuildFile; productRef = 5740CD9E9A4B4B2791F5C8BD /* NavigatorDependency */; };
+		B20D1714AAE84CDDA0D36545 /* ScreenAFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 458FCA0B2AE944E18D9CB085 /* ScreenAFeature */; };
+		D1B8F6326B834C0387A64063 /* ScreenBFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 5FBB4D72671948D69F89D377 /* ScreenBFeature */; };
+		E4553DB33E36439DA710F409 /* ScreenCKit in Frameworks */ = {isa = PBXBuildFile; productRef = 2CF94314DEA647D8A5BB9C23 /* ScreenCKit */; };
+		39E635F747C54D30A0E8DD2C /* ScreenDKit in Frameworks */ = {isa = PBXBuildFile; productRef = 46B5E19E605842F0ACE5F725 /* ScreenDKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,7 +36,6 @@
 		017EF7A0304C90E60012BA18 /* TheNavigation.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TheNavigation.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		017EF7B6304C90E90012BA18 /* TheNavigationTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TheNavigationTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		017EF7C0304C90E90012BA18 /* TheNavigationUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TheNavigationUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		017EF7D4304C91C40012BA18 /* MyLibrary */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = MyLibrary; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -70,7 +74,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6C7E41AF61ABA608F9FA3179 /* AppComposition in Frameworks */,
+				EE46ABC71F014361A40244B3 /* AppRoutes in Frameworks */,
+				C49EACA179CF4067B9A65DB7 /* NavigatorDependency in Frameworks */,
+				B20D1714AAE84CDDA0D36545 /* ScreenAFeature in Frameworks */,
+				D1B8F6326B834C0387A64063 /* ScreenBFeature in Frameworks */,
+				E4553DB33E36439DA710F409 /* ScreenCKit in Frameworks */,
+				39E635F747C54D30A0E8DD2C /* ScreenDKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -94,7 +103,6 @@
 		017EF797304C90E60012BA18 = {
 			isa = PBXGroup;
 			children = (
-				017EF7D4304C91C40012BA18 /* MyLibrary */,
 				017EF7A2304C90E60012BA18 /* TheNavigation */,
 				017EF7B9304C90E90012BA18 /* TheNavigationTests */,
 				017EF7C3304C90E90012BA18 /* TheNavigationUITests */,
@@ -132,7 +140,12 @@
 			);
 			name = TheNavigation;
 			packageProductDependencies = (
-				B80DD9CE3EA96CA823E2B393 /* AppComposition */,
+				5C96AEA950D34958B5BF197A /* AppRoutes */,
+				5740CD9E9A4B4B2791F5C8BD /* NavigatorDependency */,
+				458FCA0B2AE944E18D9CB085 /* ScreenAFeature */,
+				5FBB4D72671948D69F89D377 /* ScreenBFeature */,
+				2CF94314DEA647D8A5BB9C23 /* ScreenCKit */,
+				46B5E19E605842F0ACE5F725 /* ScreenDKit */,
 			);
 			productName = TheNavigation;
 			productReference = 017EF7A0304C90E60012BA18 /* TheNavigation.app */;
@@ -217,7 +230,7 @@
 			mainGroup = 017EF797304C90E60012BA18;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "NavigationKit" */,
+				70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 017EF7A1304C90E60012BA18 /* Products */;
@@ -602,17 +615,42 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "NavigationKit" */ = {
+		70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = NavigationKit;
+			relativePath = MyLibrary;
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		B80DD9CE3EA96CA823E2B393 /* AppComposition */ = {
+		5C96AEA950D34958B5BF197A /* AppRoutes */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "NavigationKit" */;
-			productName = AppComposition;
+			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
+			productName = AppRoutes;
+		};
+		5740CD9E9A4B4B2791F5C8BD /* NavigatorDependency */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
+			productName = NavigatorDependency;
+		};
+		458FCA0B2AE944E18D9CB085 /* ScreenAFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
+			productName = ScreenAFeature;
+		};
+		5FBB4D72671948D69F89D377 /* ScreenBFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
+			productName = ScreenBFeature;
+		};
+		2CF94314DEA647D8A5BB9C23 /* ScreenCKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
+			productName = ScreenCKit;
+		};
+		46B5E19E605842F0ACE5F725 /* ScreenDKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
+			productName = ScreenDKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
