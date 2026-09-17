@@ -21,6 +21,14 @@ public struct ScreenAView: View {
                     store.send(.pushScreenA2Tapped)
                 }
             }
+            Section("Cross-module delegate") {
+                Button("Push Screen C with context") {
+                    store.send(.pushScreenCWithContextTapped)
+                }
+                if let text = store.screenCText {
+                    LabeledContent("Screen C sent", value: text)
+                }
+            }
             Section("Navigate to") {
                 ForEach(Route.allCases.filter { $0 != .screenA }, id: \.self) { route in
                     Button(route.title) {

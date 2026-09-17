@@ -3,9 +3,11 @@ import UIKit
 
 public final class ScreenCViewController: UIViewController {
     private let navigator: Navigator
+    private let context: ScreenCContext?
 
-    public init(navigator: Navigator) {
+    public init(navigator: Navigator, context: ScreenCContext? = nil) {
         self.navigator = navigator
+        self.context = context
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -37,7 +39,9 @@ public final class ScreenCViewController: UIViewController {
             for: .touchUpInside
         )
 
-        let stack = UIStackView(arrangedSubviews: [heading, pushLocalButton] + makeButtons())
+        let stack = UIStackView(
+            arrangedSubviews: [heading] + makeContextViews() + [pushLocalButton] + makeButtons()
+        )
         stack.axis = .vertical
         stack.spacing = 12
         stack.alignment = .leading
@@ -49,6 +53,45 @@ public final class ScreenCViewController: UIViewController {
             stack.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -24),
             stack.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
         ])
+    }
+
+    /// Views driven by the optional `ScreenCContext`: a subtitle handed in by whoever pushed us,
+    /// and a textfield whose Send button reports back through `context.output`.
+    private func makeContextViews() -> [UIView] {
+        guard let context else { return [] }
+
+        var views: [UIView] = []
+
+        if let subtitle = context.subtitle {
+            let subtitleLabel = UILabel()
+            subtitleLabel.text = subtitle
+            subtitleLabel.font = .preferredFont(forTextStyle: .subheadline)
+            subtitleLabel.textColor = .secondaryLabel
+            subtitleLabel.numberOfLines = 0
+            views.append(subtitleLabel)
+        }
+
+        let textField = UITextField()
+        textField.placeholder = "Message to caller"
+        textField.borderStyle = .roundedRect
+        textField.widthAnchor.constraint(equalToConstant: 220).isActive = true
+
+        let sendButton = UIButton(type: .system)
+        sendButton.setTitle("Send", for: .normal)
+        sendButton.addAction(
+            UIAction { [output = context.output, weak textField] _ in
+                output(.textSubmitted(textField?.text ?? ""))
+            },
+            for: .touchUpInside
+        )
+
+        let row = UIStackView(arrangedSubviews: [textField, sendButton])
+        row.axis = .horizontal
+        row.spacing = 8
+        row.alignment = .center
+        views.append(row)
+
+        return views
     }
 
     private func makeButtons() -> [UIButton] {
