@@ -10,19 +10,15 @@ public struct IssuesDetailView: View {
     }
 
     public var body: some View {
-        List {
-            Section("Issues Detail") {
-                Text("Pushed locally from Issues, within the same module.")
-                    .foregroundStyle(.secondary)
-            }
-            Section("Navigate to") {
-                ForEach(Route.allCases.filter { $0 != .issues }, id: \.self) { route in
-                    Button(route.title) {
-                        store.send(.navigateButtonTapped(route))
-                    }
-                }
+        VStack(spacing: 0) {
+            NavigationDemoStrip(onPush: { store.send(.navigateButtonTapped($0)) })
+            Divider()
+            List {
+                LabeledContent("Title", value: store.issue.title)
+                LabeledContent("Status", value: store.issue.status.title)
             }
         }
-        .navigationTitle("Issues Detail")
+        .navigationTitle(store.issue.number.map { "#\($0)" } ?? "New")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

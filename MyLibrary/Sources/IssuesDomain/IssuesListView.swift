@@ -4,59 +4,49 @@ import SwiftUI
 
 public struct IssuesListView: View {
     let store: StoreOf<IssuesList>
-    @State private var isShowingInfo = false
 
     public init(store: StoreOf<IssuesList>) {
         self.store = store
     }
 
     public var body: some View {
-        List {
-            Section("Issues") {
-                Text("SwiftUI, driven by a TCA reducer.")
-                    .foregroundStyle(.secondary)
-            }
-            Section("Within this module") {
-                Button("Push to Issues Detail") {
-                    store.send(.pushDetailTapped)
-                }
-            }
-            Section("Cross-module delegate") {
-                Button("Push Screen C with context") {
-                    store.send(.pushScreenCWithContextTapped)
-                }
-                if let text = store.screenCText {
-                    LabeledContent("Screen C sent", value: text)
-                }
-            }
-            Section("Navigate to") {
-                ForEach(Route.allCases.filter { $0 != .issues }, id: \.self) { route in
-                    Button(route.title) {
-                        store.send(.navigateButtonTapped(route))
+        VStack(spacing: 0) {
+            NavigationDemoStrip(
+                pushRoutes: Route.allCases.filter { $0 != .issues },
+                onPush: { store.send(.navigateButtonTapped($0)) },
+                onPresent: { store.send(.presentButtonTapped($0)) },
+                onPushScreenCWithContext: { store.send(.pushScreenCWithContextTapped) },
+                screenCText: store.screenCText
+            )
+
+            Divider()
+
+            List {
+                ForEach(Array(store.issues.enumerated()), id: \.element.id) { index, issue in
+                    Button {
+                        store.send(.issueTapped(issue.id))
+                    } label: {
+                        IssueRowView(issue: issue, index: index)
                     }
+                    .buttonStyle(.plain)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
                 }
+                .onDelete { store.send(.deleteIssues($0)) }
             }
-            Section("Show modally") {
-                ForEach(Route.allCases, id: \.self) { route in
-                    Button(route.title) {
-                        store.send(.presentButtonTapped(route))
-                    }
-                }
-            }
+            .listStyle(.plain)
         }
         .navigationTitle("Issues")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    isShowingInfo = true
+                    store.send(.addIssueTapped)
                 } label: {
-                    Image(systemName: "info.circle")
+                    Image(systemName: "plus")
                 }
+                .accessibilityIdentifier("add_issue_button")
             }
-        }
-        .alert("Issues", isPresented: $isShowingInfo) {
-        } message: {
-            Text("SwiftUI, driven by a TCA reducer.")
         }
     }
 }
