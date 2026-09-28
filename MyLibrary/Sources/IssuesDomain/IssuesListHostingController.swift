@@ -2,16 +2,16 @@ import ComposableArchitecture
 import SwiftUI
 import UIKitNavigation
 
-/// Hosts `ScreenAView` and owns the in-module push to Screen A2. Pushing via `UIKitNavigation`'s
+/// Hosts `IssuesListView` and owns the in-module push to Issues Detail. Pushing via `UIKitNavigation`'s
 /// `UIViewController.navigationDestination(item:)` puts the pushed screen directly onto this
 /// controller's own `navigationController` — the same shared, per-tab stack the app already uses —
 /// so there's only ever one navigation bar, no nested `NavigationStack` required.
-public final class ScreenAHostingController: UIHostingController<ScreenAView> {
-    @UIBindable var store: StoreOf<ScreenAFeature>
+public final class IssuesListHostingController: UIHostingController<IssuesListView> {
+    @UIBindable var store: StoreOf<IssuesList>
 
-    public init(store: StoreOf<ScreenAFeature>) {
+    public init(store: StoreOf<IssuesList>) {
         self.store = store
-        super.init(rootView: ScreenAView(store: store))
+        super.init(rootView: IssuesListView(store: store))
     }
 
     @available(*, unavailable)
@@ -20,8 +20,8 @@ public final class ScreenAHostingController: UIHostingController<ScreenAView> {
 
     public override func viewDidLoad() {
         super.viewDidLoad()
-        navigationDestination(item: $store.scope(\.screenA2, action: \.screenA2)) { store in
-            UIHostingController(rootView: ScreenA2View(store: store))
+        navigationDestination(item: $store.scope(\.detail, action: \.detail)) { store in
+            UIHostingController(rootView: IssuesDetailView(store: store))
         }
     }
 }

@@ -2,23 +2,23 @@ import AppRoutes
 import ComposableArchitecture
 import SwiftUI
 
-public struct ScreenAView: View {
-    let store: StoreOf<ScreenAFeature>
+public struct IssuesListView: View {
+    let store: StoreOf<IssuesList>
     @State private var isShowingInfo = false
 
-    public init(store: StoreOf<ScreenAFeature>) {
+    public init(store: StoreOf<IssuesList>) {
         self.store = store
     }
 
     public var body: some View {
         List {
-            Section("Screen A") {
+            Section("Issues") {
                 Text("SwiftUI, driven by a TCA reducer.")
                     .foregroundStyle(.secondary)
             }
             Section("Within this module") {
-                Button("Push to Screen A2") {
-                    store.send(.pushScreenA2Tapped)
+                Button("Push to Issues Detail") {
+                    store.send(.pushDetailTapped)
                 }
             }
             Section("Cross-module delegate") {
@@ -30,7 +30,7 @@ public struct ScreenAView: View {
                 }
             }
             Section("Navigate to") {
-                ForEach(Route.allCases.filter { $0 != .screenA }, id: \.self) { route in
+                ForEach(Route.allCases.filter { $0 != .issues }, id: \.self) { route in
                     Button(route.title) {
                         store.send(.navigateButtonTapped(route))
                     }
@@ -44,7 +44,7 @@ public struct ScreenAView: View {
                 }
             }
         }
-        .navigationTitle("Screen A")
+        .navigationTitle("Issues")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -54,7 +54,7 @@ public struct ScreenAView: View {
                 }
             }
         }
-        .alert("Screen A", isPresented: $isShowingInfo) {
+        .alert("Issues", isPresented: $isShowingInfo) {
         } message: {
             Text("SwiftUI, driven by a TCA reducer.")
         }

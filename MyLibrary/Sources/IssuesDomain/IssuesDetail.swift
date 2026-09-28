@@ -3,7 +3,7 @@ import ComposableArchitecture
 import NavigatorDependency
 
 @Reducer
-public struct ScreenA2Feature {
+public struct IssuesDetail {
     @ObservableState
     public struct State: Equatable {
         public init() {}

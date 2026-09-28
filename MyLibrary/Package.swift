@@ -7,7 +7,7 @@ let package = Package(
     products: [
         .library(name: "AppRoutes", targets: ["AppRoutes"]),
         .library(name: "NavigatorDependency", targets: ["NavigatorDependency"]),
-        .library(name: "ScreenAFeature", targets: ["ScreenAFeature"]),
+        .library(name: "IssuesDomain", targets: ["IssuesDomain"]),
         .library(name: "ScreenBFeature", targets: ["ScreenBFeature"]),
         .library(name: "ScreenCKit", targets: ["ScreenCKit"]),
         .library(name: "ScreenDKit", targets: ["ScreenDKit"]),
@@ -29,7 +29,7 @@ let package = Package(
         ),
 
         .target(
-            name: "ScreenAFeature",
+            name: "IssuesDomain",
             dependencies: [
                 "AppRoutes",
                 "NavigatorDependency",

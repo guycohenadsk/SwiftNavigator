@@ -3,10 +3,10 @@ import ComposableArchitecture
 import NavigatorDependency
 
 @Reducer
-public struct ScreenAFeature {
+public struct IssuesList {
     @ObservableState
     public struct State: Equatable {
-        @Presents public var screenA2: ScreenA2Feature.State?
+        @Presents public var detail: IssuesDetail.State?
         public var screenCText: String?
 
         public init() {}
@@ -15,9 +15,9 @@ public struct ScreenAFeature {
     public enum Action {
         case navigateButtonTapped(Route)
         case presentButtonTapped(Route)
-        case pushScreenA2Tapped
+        case pushDetailTapped
         case pushScreenCWithContextTapped
-        case screenA2(PresentationAction<ScreenA2Feature.Action>)
+        case detail(PresentationAction<IssuesDetail.Action>)
         case screenC(ScreenCOutput)
     }
 
@@ -34,8 +34,8 @@ public struct ScreenAFeature {
             case let .presentButtonTapped(route):
                 let navigator = navigator
                 return .run { _ in await navigator.present(route) }
-            case .pushScreenA2Tapped:
-                state.screenA2 = ScreenA2Feature.State()
+            case .pushDetailTapped:
+                state.detail = IssuesDetail.State()
                 return .none
             case .pushScreenCWithContextTapped:
                 let navigator = navigator
@@ -46,7 +46,7 @@ public struct ScreenAFeature {
                     // and this effect completes on its own.
                     let outputs = AsyncStream<ScreenCOutput> { continuation in
                         let context = ScreenCContext(
-                            subtitle: "I have been pushed from Screen A",
+                            subtitle: "I have been pushed from Issues",
                             output: { continuation.yield($0) }
                         )
                         Task { await navigator.push(.screenC(context)) }
@@ -55,15 +55,15 @@ public struct ScreenAFeature {
                         await send(.screenC(output))
                     }
                 }
-            case .screenA2:
+            case .detail:
                 return .none
             case let .screenC(.textSubmitted(text)):
                 state.screenCText = text
                 return .none
             }
         }
-        .ifLet(\.$screenA2, action: \.screenA2) {
-            ScreenA2Feature()
+        .ifLet(\.$detail, action: \.detail) {
+            IssuesDetail()
         }
     }
 }
