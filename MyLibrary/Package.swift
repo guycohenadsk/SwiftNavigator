@@ -47,6 +47,14 @@ let package = Package(
             ]
         ),
 
+        .testTarget(
+            name: "IssuesDomainTests",
+            dependencies: [
+                "IssuesDomain",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ]
+        ),
+
         .target(name: "ScreenCKit", dependencies: ["AppRoutes"]),
         .target(name: "ScreenDKit", dependencies: ["AppRoutes"]),
     ]

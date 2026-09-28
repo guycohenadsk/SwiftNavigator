@@ -30,6 +30,8 @@ public struct IssuesList {
     }
 
     @Dependency(\.navigator) var navigator
+    @Dependency(\.uuid) var uuid
+    @Dependency(\.date.now) var now
 
     public init() {}
 
@@ -67,7 +69,7 @@ public struct IssuesList {
                 return open(id, in: &state)
 
             case .addIssueTapped:
-                let issue = Issue(status: .draft)
+                let issue = Issue(id: uuid(), status: .draft, createdAt: now)
                 state.$issues.withLock { $0.append(issue) }
                 return open(issue.id, in: &state)
 
