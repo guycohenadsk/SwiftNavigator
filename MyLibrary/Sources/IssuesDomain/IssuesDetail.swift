@@ -49,7 +49,6 @@ public struct IssuesDetail {
         public var expandedDateField: Field?
         public var isDescriptionExpanded = false
         public var isLocationDetailsExpanded = false
-        public var isTitleFocused = false
         @Presents public var alert: AlertState<Action.Alert>?
 
         public init(issue: Shared<Issue>) {
@@ -94,7 +93,6 @@ public struct IssuesDetail {
     public enum Action {
         case navigateButtonTapped(Route)
         case titleChanged(String)
-        case titleFocusChanged(Bool)
         case statusSelected(IssueStatus)
         case typeCodeSelected(String?)
         case assigneeSelected(String?)
@@ -137,10 +135,6 @@ public struct IssuesDetail {
 
             case let .titleChanged(title):
                 state.$issue.withLock { $0.title = title }
-                return .none
-
-            case let .titleFocusChanged(isFocused):
-                state.isTitleFocused = isFocused
                 return .none
 
             case let .statusSelected(status):
