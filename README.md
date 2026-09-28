@@ -25,26 +25,70 @@ It demonstrates, end to end:
 | ✅ | Capability |
 |---|---|
 | **State-driven navigation** | Every push, pop, and modal is a plain value in an `@Observable` model. Mutate the state → the UI follows. Swipe back / dismiss → the state syncs back. No imperative `pushViewController` calls from features. |
-| **SwiftUI + TCA screens** | Screens A & B are SwiftUI views driven by Composable Architecture reducers, hosted in `UIHostingController`s. |
+| **SwiftUI + TCA screens** | Issues and Screen B are SwiftUI views driven by Composable Architecture reducers, hosted in `UIHostingController`s. |
 | **Plain UIKit screens** | Screens C & D are hand-rolled `UIViewController`s — no TCA, no SwiftUI, no `@Dependency`. They get the `Navigator` through their initializer. |
-| **Endless pushes** | Any screen can push any screen, in any order, forever — including the same screen multiple times on one stack (`A → C → A → C → …`). |
+| **Endless pushes** | Any screen can push any screen, in any order, forever — including the same screen multiple times on one stack (`Issues → C → Issues → C → …`). |
 | **Endless presents** | Any screen can present any screen modally; each modal gets its **own navigation stack**, and modals can present more modals, recursively, with no depth limit. |
 | **Passing data forward** | A caller attaches a typed payload (`ScreenCContext`) to the destination it pushes — no global state, no side channels. |
 | **Passing data back** | The pushed screen reports events back through a closure in that payload (`ScreenCOutput`) — the delegate pattern, without either module importing the other. |
-| **Hard domain boundaries** | Screen A does not know Screen B. No feature imports another feature. They all know exactly one thing: the shared **routes** module. |
+| **Hard domain boundaries** | `IssuesDomain` does not know Screen B. No feature imports another feature. They all know exactly one thing: the shared **routes** module. |
+| **Shared persistence** | `IssuesDomain` stores its issues in `@Shared(.fileStorage)`. The detail screen edits a `Shared<Issue>` derived from the list's array, so an edit is a write to the list *and* to disk, with no save action travelling anywhere. |
 
 ---
 
-## 🧩 The four screens
+## 🧩 The four tabs
 
-The app is a `UITabBarController` with four tabs. Every screen shows "Go to …" / "Present …" buttons for every *other* screen — generated from `Route.allCases`, which is what makes the "endless navigation" claim testable by hand.
+The app is a `UITabBarController` with four tabs. Every screen offers "Push …" / "Present …" chips for every *other* screen — generated from `Route.allCases`, which is what makes the "endless navigation" claim testable by hand.
 
 | Tab | Screen | Built with | Navigation style |
 |-----|--------|-----------|------------------|
-| 🅰️ | **Screen A** (+ in-module child **A2**) | SwiftUI + TCA `@Reducer` | Cross-module via `Navigator`, in-module child via `@Presents` / `.ifLet` |
-| 🅱️ | **Screen B** (+ in-module child **B2**) | SwiftUI + TCA `@Reducer` | Same as A — proves the pattern repeats |
+| ❗ | **Issues** (+ in-module child **Issues Detail**) | SwiftUI + TCA `@Reducer` | Cross-module via `Navigator`, in-module child via `@Presents` / `.ifLet` |
+| 🅱️ | **Screen B** (+ in-module child **B2**) | SwiftUI + TCA `@Reducer` | Same as Issues — proves the pattern repeats |
 | 🅲 | **Screen C** (+ **C2**) | Plain UIKit | `Navigator` injected via `init` — and the star of the [data passing demo](#-passing-data-forward-and-back) |
 | 🅳 | **Screen D** (+ **D2**) | Plain UIKit | Same as C |
+
+The Issues tab is a real feature rather than a placeholder: a list of construction issues and a
+detail form, with the navigation demo compressed into three lines of chips between the navigation
+bar and the list. Screens B, C and D stay deliberately generic, so the app shows a production-shaped
+feature and a bare navigation harness using the same seams.
+
+---
+
+## ❗ The Issues feature
+
+The Issues tab is the one tab that carries a real domain, so the POC shows its seams under
+something with actual state rather than four buttons.
+
+| Piece | What it does |
+|-------|--------------|
+| `Issue` | A plain `struct` — `Codable`, `Equatable`, `Sendable`. One model for both screens. |
+| `@Shared(.issues)` | `IdentifiedArrayOf<Issue>` persisted to `Documents/issues.json`. The seed data is the key's *default*, so first launch has content with no seeding code. |
+| `IssuesList` | The list, plus the three-line navigation strip. Creating and deleting write straight to the shared array. |
+| `IssuesDetail` | Pushed in-module via `@Presents` — never through the `Navigator`, because it's not a catalog screen. |
+
+The part worth reading the code for is how detail edits get home:
+
+```swift
+// IssuesList — deriving a Shared that points *into* the persisted array
+guard let issue = Shared(state.$issues[id: id]) else { return .none }
+state.detail = IssuesDetail.State(issue: issue)
+```
+
+```swift
+// IssuesDetail — editing it writes to the list and to disk at once
+case let .titleChanged(title):
+    state.$issue.withLock { $0.title = title }
+    return .none
+```
+
+There is no save action, no delegate carrying the edited issue back, and no cancel. The detail
+screen does not "return" anything, because it was never holding a copy.
+
+The UI follows Autodesk Construction Cloud's issues-list and issue-details specs: row geometry,
+the `#928  -  Commissioning` title format, status pin colors, and the collapsible
+"More Issue Details (N Empty)" section. What those specs assume and this POC has no backend for —
+AI suggestion pins, attachments, references, permissions, and server-configured field ordering —
+is left out; field order is a fixed array here.
 
 ---
 
@@ -61,7 +105,7 @@ flowchart TB
     end
 
     subgraph features["🧱 Feature modules — sealed off from each other"]
-        A["ScreenAFeature<br/>SwiftUI + TCA"]
+        A["IssuesDomain<br/>SwiftUI + TCA"]
         B["ScreenBFeature<br/>SwiftUI + TCA"]
         C["ScreenCKit<br/>plain UIKit"]
         D["ScreenDKit<br/>plain UIKit"]
@@ -99,7 +143,7 @@ flowchart TB
 
 **Read the arrows carefully — the ones that *don't* exist are the point:**
 
-- ❌ `ScreenAFeature` never imports `ScreenBFeature`, `ScreenCKit`, or `ScreenDKit` (and vice versa, for every pair).
+- ❌ `IssuesDomain` never imports `ScreenBFeature`, `ScreenCKit`, or `ScreenDKit` (and vice versa, for every pair).
 - ❌ No feature imports the resolver, the navigator implementation, or the app target.
 - ✅ Every feature imports exactly one shared thing: **`AppRoutes`** — a tiny leaf module of value types and one protocol.
 - ✅ Only the **composition root** imports the features, because someone has to actually build the screens.
@@ -114,8 +158,8 @@ Three small types share the work that one type couldn't do alone:
 
 | Type | What it is | Why it exists |
 |------|-----------|---------------|
-| **`Route`** | Stateless catalog of every screen: `.screenA`, `.screenB`, `.screenC`, `.screenD`. `Hashable`, `CaseIterable`. | Powers the "go anywhere" demo buttons (`Route.allCases`) and context-free one-liners like `navigator.push(.screenD)`. |
-| **`Destination`** | A route **plus its payload**: `.screenC(ScreenCContext? = nil)`. | Data rides *on the push itself*. The payload is bound to the case, so an illegal pairing (Screen A carrying Screen C's context) cannot even be written. |
+| **`Route`** | Stateless catalog of every screen: `.issues`, `.screenB`, `.screenC`, `.screenD`. `Hashable`, `CaseIterable`. | Powers the "go anywhere" demo buttons (`Route.allCases`) and context-free one-liners like `navigator.push(.screenD)`. |
+| **`Destination`** | A route **plus its payload**: `.screenC(ScreenCContext? = nil)`. | Data rides *on the push itself*. The payload is bound to the case, so an illegal pairing (Issues carrying Screen C's context) cannot even be written. |
 | **`RouteEntry`** | `Destination` + a `UUID`, with identity-based `Hashable`. | Navigation stacks diff their elements by `Hashable` — but closures in payloads aren't hashable, and two pushes of the same screen must stay distinct. The `UUID` gives every push its own identity, which is exactly what makes **endless** `A → C → A → C` stacks safe. |
 
 And one protocol ties it together — the **only seam any feature depends on**:
@@ -211,7 +255,7 @@ Dismissing a modal sets `presented = nil` — state-driven, like everything else
 
 ## 📬 Passing data forward and back
 
-The showcase: **Screen A (SwiftUI + TCA) ⇄ Screen C (plain UIKit)** — two modules that have never heard of each other.
+The showcase: **Issues (SwiftUI + TCA) ⇄ Screen C (plain UIKit)** — two modules that have never heard of each other.
 
 The contract lives in `AppRoutes`, where both can see it:
 
@@ -228,16 +272,16 @@ public enum ScreenCOutput: Sendable {
 }
 ```
 
-**Forward** — Screen A's reducer attaches the context to the push itself, bridging the output closure into an `AsyncStream` so Screen C's events come back as ordinary TCA actions:
+**Forward** — the issues list's reducer attaches the context to the push itself, bridging the output closure into an `AsyncStream` so Screen C's events come back as ordinary TCA actions:
 
 ```swift
-// ScreenAFeature reducer
+// IssuesList reducer
 case .pushScreenCWithContextTapped:
     let navigator = navigator
     return .run { send in
         let outputs = AsyncStream<ScreenCOutput> { continuation in
             let context = ScreenCContext(
-                subtitle: "I have been pushed from Screen A",
+                subtitle: "I have been pushed from the issues list",
                 output: { continuation.yield($0) }   // ← the return channel
             )
             Task { await navigator.push(.screenC(context)) }
@@ -250,22 +294,22 @@ case .pushScreenCWithContextTapped:
 
 The lifetime takes care of itself: the continuation lives only inside the context's `output` closure, which travels with the pushed `RouteEntry`. When Screen C is popped, the entry — and with it the closure and continuation — deallocates, the stream finishes, and the effect completes on its own. Scoped to *this* push; no globals to clean up.
 
-**Back** — Screen C fires the closure; Screen A's reducer treats it like any other action:
+**Back** — Screen C fires the closure; the issues list's reducer treats it like any other action:
 
 ```swift
 // ScreenCViewController (plain UIKit) — "Send" button
 output(.textSubmitted(textField.text ?? ""))
 
-// ScreenAFeature reducer
+// IssuesList reducer
 case let .screenC(.textSubmitted(text)):
-    state.screenCText = text   // Screen A's UI updates with Screen C's answer
+    state.screenCText = text   // the issues list shows Screen C's answer in its Context line
     return .none
 ```
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant A as 🅰️ Screen A<br/>(SwiftUI + TCA)
+    participant A as ❗ Issues<br/>(SwiftUI + TCA)
     participant Routes as 🍃 AppRoutes<br/>(shared contract)
     participant C as 🅲 Screen C<br/>(plain UIKit)
 
@@ -274,7 +318,7 @@ sequenceDiagram
     Note over C: shows subtitle from A,<br/>renders a text field
     C-->>Routes: context.output(.textSubmitted("hello"))
     Routes-->>A: AsyncStream yields → reducer gets .screenC(.textSubmitted("hello"))
-    Note over A: reducer sets state.screenCText —<br/>Screen A displays C's message
+    Note over A: reducer sets state.screenCText —<br/>the issues list displays C's message
 
     Note over A,C: A and C never import each other.<br/>Both know only the contract in AppRoutes.
 ```
@@ -288,8 +332,8 @@ This is the classic **delegate pattern**, rebuilt for module boundaries: the "de
 | Who | Knows about | Explicitly does **not** know about |
 |-----|-------------|-----------------------------------|
 | `AppRoutes` 🍃 | Nothing (leaf — zero dependencies) | Any screen, any framework choice |
-| `ScreenAFeature` / `ScreenBFeature` | `AppRoutes`, `NavigatorDependency`, TCA | Each other, Screen C/D, the resolver, how navigation is implemented |
-| `ScreenCKit` / `ScreenDKit` | `AppRoutes` **only** | Each other, Screen A/B, TCA (they don't even link it) |
+| `IssuesDomain` / `ScreenBFeature` | `AppRoutes`, `NavigatorDependency`, TCA | Each other, Screen C/D, the resolver, how navigation is implemented |
+| `ScreenCKit` / `ScreenDKit` | `AppRoutes` **only** | Each other, Issues, Screen B, TCA (they don't even link it) |
 | `NavigatorDependency` | `AppRoutes`, TCA | Any screen |
 | App target (composition root) | Everything | — (that's its job, and *only* its job) |
 
@@ -298,7 +342,7 @@ Consequences worth noticing:
 - **Screens are swappable.** Rewrite Screen C in SwiftUI tomorrow — only `ScreenResolver` (one switch case) changes. No caller notices.
 - **Features build in isolation** and could be extracted to separate repos as-is.
 - **Reducers are testable** — `@Dependency(\.navigator)` swaps for a spy in tests; `UnimplementedNavigator` fails loudly if the composition root ever forgets to install the real one.
-- **The dependency graph physically enforces the architecture.** "Screen A must not know Screen B" isn't a code-review convention here — it's a compile error.
+- **The dependency graph physically enforces the architecture.** "Issues must not know Screen B" isn't a code-review convention here — it's a compile error.
 
 ---
 
@@ -314,11 +358,13 @@ SwiftNavigator
 │       ├── ScreenResolver.swift      #    the ONE Destination → screen switch
 │       └── NavigatorTabBarController.swift
 ├── MyLibrary/                        # 📦 Local SPM package
+│   ├── Tests/
+│   │   └── IssuesDomainTests/        #    TestStore coverage for the issues feature
 │   └── Sources/
 │       ├── AppRoutes/                # 🍃 Route · Destination · RouteEntry
 │       │                             #    Navigator · ScreenCContext/Output
 │       ├── NavigatorDependency/      #    @Dependency(\.navigator) + Unimplemented
-│       ├── ScreenAFeature/           # 🅰️ SwiftUI + TCA (+ child A2)
+│       ├── IssuesDomain/             # ❗ SwiftUI + TCA — IssuesList + IssuesDetail, @Shared storage
 │       ├── ScreenBFeature/           # 🅱️ SwiftUI + TCA (+ child B2)
 │       ├── ScreenCKit/               # 🅲 plain UIKit (+ C2)
 │       └── ScreenDKit/               # 🅳 plain UIKit (+ D2)
@@ -340,8 +386,19 @@ Build & run (iOS 17+). Then try to break it:
 
 1. **Endless pushes** — from any tab, keep tapping "Go to …" buttons; stack the same screen five times; swipe back through all of it.
 2. **Endless presents** — "Present Screen D" → inside the modal, push around → present *another* modal → repeat.
-3. **Data round-trip** — on Screen A, tap "Push Screen C with context": C shows A's subtitle; type a message, hit **Send**, pop back — Screen A is displaying what you typed in C.
-4. **Tab isolation** — build a deep stack on tab A, switch to tab B, come back: A's stack is exactly where you left it, because it's just an array that never went anywhere.
+3. **Data round-trip** — on Issues, tap the **Context** chip: C shows the list's subtitle; type a message, hit **Send**, pop back — the Context line is displaying what you typed in C.
+4. **Tab isolation** — build a deep stack on the Issues tab, switch to tab B, come back: the stack is exactly where you left it, because it's just an array that never went anywhere.
+5. **Shared persistence** — open an issue, retype its title, swipe back: the row has already changed. Kill the app and relaunch: it is still changed, because the list is `@Shared(.fileStorage)` and the detail screen was editing that same storage.
+
+Run the tests:
+
+```bash
+cd MyLibrary
+xcodebuild test -scheme MyLibrary-Package \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+```
+
+(`swift test` can't run them — the package is iOS-only, and SwiftPM would try to build it for macOS.)
 
 ---
 
