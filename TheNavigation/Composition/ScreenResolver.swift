@@ -1,6 +1,6 @@
 import AppRoutes
 import ComposableArchitecture
-import ScreenAFeature
+import IssuesDomain
 import ScreenBFeature
 import ScreenCKit
 import ScreenDKit
@@ -12,8 +12,8 @@ import UIKit
 enum ScreenResolver {
     static func viewController(for destination: Destination, navigator: Navigator) -> UIViewController {
         switch destination {
-        case .screenA:
-            ScreenAHostingController(store: Store(initialState: ScreenAFeature.State()) { ScreenAFeature() })
+        case .issues:
+            IssuesListHostingController(store: Store(initialState: IssuesList.State()) { IssuesList() })
         case .screenB:
             ScreenBHostingController(store: Store(initialState: ScreenBFeature.State()) { ScreenBFeature() })
         case let .screenC(context):

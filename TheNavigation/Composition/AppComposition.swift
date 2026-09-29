@@ -16,7 +16,7 @@ enum AppComposition {
 
         let tabBarController = NavigatorTabBarController(navigator: navigator)
         tabBarController.viewControllers = [
-            makeTab(root: .screenA, path: \.pathA, navigator: navigator, title: "Screen A", systemImage: "a.circle"),
+            makeTab(root: .issues, path: \.pathIssues, navigator: navigator, title: "Issues", systemImage: "exclamationmark.bubble"),
             makeTab(root: .screenB, path: \.pathB, navigator: navigator, title: "Screen B", systemImage: "b.circle"),
             makeTab(root: .screenC(), path: \.pathC, navigator: navigator, title: "Screen C", systemImage: "c.circle"),
             makeTab(root: .screenD, path: \.pathD, navigator: navigator, title: "Screen D", systemImage: "d.circle"),

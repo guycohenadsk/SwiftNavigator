@@ -3,7 +3,7 @@
 /// is what actually travels through the `Navigator`. Screens that take no context simply have no
 /// payload, so an illegal pairing (e.g. Screen A carrying Screen C's context) cannot be written.
 public enum Destination: Sendable {
-    case screenA
+    case issues
     case screenB
     case screenC(ScreenCContext? = nil)
     case screenD
@@ -12,7 +12,7 @@ public enum Destination: Sendable {
     /// call sites working unchanged.
     public init(_ route: Route) {
         switch route {
-        case .screenA: self = .screenA
+        case .issues: self = .issues
         case .screenB: self = .screenB
         case .screenC: self = .screenC()
         case .screenD: self = .screenD

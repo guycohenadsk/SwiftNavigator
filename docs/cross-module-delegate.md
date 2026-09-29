@@ -1,5 +1,10 @@
 # Cross-module delegate communication: Screen A → Screen C
 
+> **Historical note.** This document records how the data-passing design was chosen, and uses the
+> names in play at the time. The `ScreenAFeature` *target* is now `IssuesDomain`; the reducers
+> inside it, `ScreenAFeature` and `ScreenA2Feature`, are now `IssuesList` and `IssuesDetail`; and
+> `Route.screenA` is now `Route.issues`. The decision and the shipped mechanism are unchanged.
+
 ## Background: how the app is built today
 
 NavigationKit is a Swift package split into small, single-purpose targets (see `Package.swift`):

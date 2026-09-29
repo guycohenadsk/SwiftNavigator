@@ -65,7 +65,7 @@ final class PresentedNavigator: Navigator, PresentationHost, @unchecked Sendable
 @Observable
 final class AppNavigator: Navigator, PresentationHost, @unchecked Sendable {
     var tabIndex = 0
-    var pathA: [RouteEntry] = []
+    var pathIssues: [RouteEntry] = []
     var pathB: [RouteEntry] = []
     var pathC: [RouteEntry] = []
     var pathD: [RouteEntry] = []
@@ -79,7 +79,7 @@ final class AppNavigator: Navigator, PresentationHost, @unchecked Sendable {
         }
         let entry = RouteEntry(destination: destination)
         switch tabIndex {
-        case 0: pathA.append(entry)
+        case 0: pathIssues.append(entry)
         case 1: pathB.append(entry)
         case 2: pathC.append(entry)
         default: pathD.append(entry)
@@ -92,7 +92,7 @@ final class AppNavigator: Navigator, PresentationHost, @unchecked Sendable {
             return
         }
         switch tabIndex {
-        case 0: _ = pathA.popLast()
+        case 0: _ = pathIssues.popLast()
         case 1: _ = pathB.popLast()
         case 2: _ = pathC.popLast()
         default: _ = pathD.popLast()
@@ -105,7 +105,7 @@ final class AppNavigator: Navigator, PresentationHost, @unchecked Sendable {
             return
         }
         switch tabIndex {
-        case 0: pathA.removeAll()
+        case 0: pathIssues.removeAll()
         case 1: pathB.removeAll()
         case 2: pathC.removeAll()
         default: pathD.removeAll()
