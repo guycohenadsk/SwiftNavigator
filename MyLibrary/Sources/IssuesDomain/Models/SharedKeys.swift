@@ -15,3 +15,11 @@ where Self == FileStorageKey<IdentifiedArrayOf<Issue>>.Default {
         ]
     }
 }
+
+extension SharedReaderKey where Self == InMemoryKey<String?>.Default {
+    /// The last text Screen C sent back to the issues list. Shared rather than per-store, so the
+    /// header shows it whichever path started the flow — the Context chip or a deep link.
+    public static var screenCText: Self {
+        Self[.inMemory("issues.screenCText"), default: nil]
+    }
+}

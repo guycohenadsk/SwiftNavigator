@@ -1,0 +1,132 @@
+import XCTest
+
+/// End-to-end checks of navigation in the running app: a deep link, a result travelling back from
+/// a picker, and dismissal reporting no result.
+final class NavigationFlowUITests: XCTestCase {
+    private var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launch()
+    }
+
+    /// `demoapp://issues/<id>` from another tab switches to the Issues tab, resets its stack, and
+    /// pushes the issue.
+    @MainActor
+    func testDeepLinkOpensIssueInIssuesTab() throws {
+        app.tabBars.buttons["Screen D"].tap()
+
+        app.open(try XCTUnwrap(URL(string: "demoapp://issues/00000000-0000-0000-0000-000000000002")))
+        confirmOpenInAppIfAsked()
+
+        XCTAssertTrue(app.navigationBars["#931"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Issues"].isSelected)
+    }
+
+    /// `demoapp://screenC` from another tab: Screen C is a tab root, so the link selects its tab.
+    @MainActor
+    func testDeepLinkOpensScreenC() throws {
+        app.tabBars.buttons["Screen B"].tap()
+
+        app.open(try XCTUnwrap(URL(string: "demoapp://screenC")))
+        confirmOpenInAppIfAsked()
+
+        XCTAssertTrue(app.staticTexts["Screen C · UIKit"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Screen C"].isSelected)
+    }
+
+    /// `demoapp://issues?action=screenCContext` from another tab: lands on the Issues tab, the Issues
+    /// module runs its own "push Screen C with context", and Send fills the Issues header.
+    @MainActor
+    func testDeepLinkRunsScreenCContext() throws {
+        app.tabBars.buttons["Screen B"].tap()
+
+        // Through the system, like `simctl openurl`: `XCUIApplication.open(_:)` drops the query.
+        XCUIDevice.shared.system.open(try XCTUnwrap(URL(string: "demoapp://issues?action=screenCContext")))
+        confirmOpenInAppIfAsked()
+
+        XCTAssertTrue(app.staticTexts["I have been pushed from the issues list"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Issues"].isSelected)
+        let field = app.textFields["Message to caller"]
+        field.tap()
+        field.typeText("From a link")
+        app.buttons["Send"].tap()
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["Screen C said “From a link”"].waitForExistence(timeout: 5))
+    }
+
+    /// Screen B presents the Issues picker with `.selectSingle(.issues)`; the picked issue comes back
+    /// as `.selectedEntity` and the sheet closes itself.
+    @MainActor
+    func testPickerReturnsIssueToScreenB() {
+        app.tabBars.buttons["Screen B"].tap()
+        app.buttons["Link an issue"].tap()
+
+        XCTAssertTrue(app.navigationBars["Pick an issue"].waitForExistence(timeout: 5))
+        app.buttons.containing(NSPredicate(format: "label CONTAINS 'Plumbing riser leak'")).firstMatch.tap()
+
+        XCTAssertTrue(app.buttons["Link another issue"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["Pick an issue"].exists)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Plumbing riser leak'")).firstMatch.exists)
+    }
+
+    /// Swiping the picker away reports `.dismissed`: Screen B stays unlinked.
+    @MainActor
+    func testDismissingPickerLinksNothing() {
+        app.tabBars.buttons["Screen B"].tap()
+        app.buttons["Link an issue"].tap()
+
+        let pickerBar = app.navigationBars["Pick an issue"]
+        XCTAssertTrue(pickerBar.waitForExistence(timeout: 5))
+        pickerBar.swipeDown(velocity: .fast)
+
+        XCTAssertTrue(app.buttons["Link an issue"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Link another issue"].exists)
+    }
+
+    /// Issue details hosts the RefPicker: Add Reference presents the Issues picker, and the pick
+    /// shows up under "Related issues".
+    @MainActor
+    func testAddReferenceToIssue() {
+        app.buttons.containing(NSPredicate(format: "label CONTAINS 'Commissioning'")).firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["#928"].waitForExistence(timeout: 5))
+
+        let add = app.buttons["Add Reference"]
+        for _ in 0..<4 where !add.isHittable { app.swipeUp() }
+        add.tap()
+
+        XCTAssertTrue(app.navigationBars["Pick an issue"].waitForExistence(timeout: 5))
+        app.buttons.containing(NSPredicate(format: "label CONTAINS 'Plumbing riser leak'")).firstMatch.tap()
+
+        XCTAssertTrue(app.navigationBars["#928"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS 'Plumbing riser leak'")).firstMatch.waitForExistence(timeout: 5))
+    }
+
+    /// The Issues list pushes Screen C with `.compose`; each Send comes back as `.message`, Screen C
+    /// stays up, and after popping back the Context chip shows the last text.
+    @MainActor
+    func testScreenCContextReportsBackToIssues() {
+        app.buttons["Push Screen C with context"].tap()
+
+        XCTAssertTrue(app.staticTexts["I have been pushed from the issues list"].waitForExistence(timeout: 5))
+        let field = app.textFields["Message to caller"]
+        field.tap()
+        field.typeText("Hello")
+        app.buttons["Send"].tap()
+        XCTAssertTrue(app.textFields["Message to caller"].exists)   // still on Screen C
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["Screen C said “Hello”"].waitForExistence(timeout: 5))
+    }
+
+    /// The first time a URL targets the app, iOS may ask for confirmation in SpringBoard.
+    private func confirmOpenInAppIfAsked() {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let open = springboard.buttons["Open"]
+        if open.waitForExistence(timeout: 3) {
+            open.tap()
+        }
+    }
+}

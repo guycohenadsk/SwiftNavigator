@@ -1,10 +1,10 @@
-import AppRoutes
+import NavigationCore
 import UIKit
 
 public final class ScreenDViewController: UIViewController {
-    private let navigator: Navigator
+    private let navigator: any Navigator
 
-    public init(navigator: Navigator) {
+    public init(navigator: any Navigator) {
         self.navigator = navigator
         super.init(nibName: nil, bundle: nil)
     }
@@ -30,7 +30,7 @@ public final class ScreenDViewController: UIViewController {
         let pushLocalButton = UIButton(type: .system)
         pushLocalButton.setTitle("Push to Screen D2", for: .normal)
         pushLocalButton.addAction(
-            UIAction { [weak self, navigator] _ in
+            UIAction { [weak self] _ in
                 guard let self else { return }
                 navigationController?.pushViewController(ScreenD2ViewController(navigator: navigator), animated: true)
             },
@@ -52,12 +52,18 @@ public final class ScreenDViewController: UIViewController {
     }
 
     private func makeButtons() -> [UIButton] {
-        Route.allCases.filter { $0 != .screenD }.map { route in
-            let button = UIButton(type: .system)
-            button.setTitle("Go to \(route.title)", for: .normal)
-            button.addAction(UIAction { [navigator] _ in navigator.push(route) }, for: .touchUpInside)
-            return button
-        }
+        [
+            navigationButton("Open Issues") { [navigator] in
+                navigator.push(NavigationRequest(intent: .browse(.issues)))
+            },
+            navigationButton("Open Screen B · sheet") { [navigator] in
+                navigator.present(NavigationRequest(intent: .browse(.screenB)))
+            },
+            navigationButton("Close") { [navigator] in
+                // Closes the top screen — this one — whether it was pushed or presented.
+                navigator.complete(with: .dismissed)
+            },
+        ]
     }
 
     @objc

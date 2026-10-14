@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		EE46ABC71F014361A40244B3 /* AppRoutes in Frameworks */ = {isa = PBXBuildFile; productRef = 5C96AEA950D34958B5BF197A /* AppRoutes */; };
+		EE46ABC71F014361A40244B3 /* NavigationCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5C96AEA950D34958B5BF197A /* NavigationCore */; };
 		C49EACA179CF4067B9A65DB7 /* NavigatorDependency in Frameworks */ = {isa = PBXBuildFile; productRef = 5740CD9E9A4B4B2791F5C8BD /* NavigatorDependency */; };
 		B20D1714AAE84CDDA0D36545 /* IssuesDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 458FCA0B2AE944E18D9CB085 /* IssuesDomain */; };
 		D1B8F6326B834C0387A64063 /* ScreenBFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 5FBB4D72671948D69F89D377 /* ScreenBFeature */; };
@@ -74,7 +74,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				EE46ABC71F014361A40244B3 /* AppRoutes in Frameworks */,
+				EE46ABC71F014361A40244B3 /* NavigationCore in Frameworks */,
 				C49EACA179CF4067B9A65DB7 /* NavigatorDependency in Frameworks */,
 				B20D1714AAE84CDDA0D36545 /* IssuesDomain in Frameworks */,
 				D1B8F6326B834C0387A64063 /* ScreenBFeature in Frameworks */,
@@ -140,7 +140,7 @@
 			);
 			name = TheNavigation;
 			packageProductDependencies = (
-				5C96AEA950D34958B5BF197A /* AppRoutes */,
+				5C96AEA950D34958B5BF197A /* NavigationCore */,
 				5740CD9E9A4B4B2791F5C8BD /* NavigatorDependency */,
 				458FCA0B2AE944E18D9CB085 /* IssuesDomain */,
 				5FBB4D72671948D69F89D377 /* ScreenBFeature */,
@@ -622,10 +622,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		5C96AEA950D34958B5BF197A /* AppRoutes */ = {
+		5C96AEA950D34958B5BF197A /* NavigationCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
-			productName = AppRoutes;
+			productName = NavigationCore;
 		};
 		5740CD9E9A4B4B2791F5C8BD /* NavigatorDependency */ = {
 			isa = XCSwiftPackageProductDependency;

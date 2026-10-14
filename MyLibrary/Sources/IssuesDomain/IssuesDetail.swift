@@ -1,7 +1,8 @@
-import AppRoutes
 import ComposableArchitecture
 import Foundation
+import NavigationCore
 import NavigatorDependency
+import RefPicker
 
 @Reducer
 public struct IssuesDetail {
@@ -50,6 +51,8 @@ public struct IssuesDetail {
         public var isDescriptionExpanded = false
         public var isLocationDetailsExpanded = false
         @Presents public var alert: AlertState<Action.Alert>?
+        /// Related issues, kept for this visit only — like the reference's `@State` references.
+        public var references = RefPicker.State(target: .issues)
 
         public init(issue: Shared<Issue>) {
             self._issue = issue
@@ -91,7 +94,8 @@ public struct IssuesDetail {
     }
 
     public enum Action {
-        case navigateButtonTapped(Route)
+        case openScreenCTapped
+        case openScreenDAsSheetTapped
         case titleChanged(String)
         case statusSelected(IssueStatus)
         case typeCodeSelected(String?)
@@ -108,6 +112,7 @@ public struct IssuesDetail {
         case emptyFieldsToggled
         case deleteButtonTapped
         case alert(PresentationAction<Alert>)
+        case references(RefPicker.Action)
         case delegate(Delegate)
 
         @CasePathable
@@ -127,11 +132,18 @@ public struct IssuesDetail {
     public init() {}
 
     public var body: some ReducerOf<Self> {
+        Scope(state: \.references, action: \.references) {
+            RefPicker()
+        }
         Reduce { state, action in
             switch action {
-            case let .navigateButtonTapped(route):
+            case .openScreenCTapped:
                 let navigator = navigator
-                return .run { _ in await navigator.push(route) }
+                return .run { _ in await navigator.push(NavigationRequest(intent: .browse(.screenC))) }
+
+            case .openScreenDAsSheetTapped:
+                let navigator = navigator
+                return .run { _ in await navigator.present(NavigationRequest(intent: .browse(.screenD))) }
 
             case let .titleChanged(title):
                 state.$issue.withLock { $0.title = title }
@@ -203,7 +215,7 @@ public struct IssuesDetail {
             case .alert(.presented(.confirmDelete)):
                 return .send(.delegate(.deleteRequested))
 
-            case .alert, .delegate:
+            case .alert, .delegate, .references:
                 return .none
             }
         }

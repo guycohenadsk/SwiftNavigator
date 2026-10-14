@@ -5,8 +5,9 @@ let package = Package(
     name: "MyLibrary",
     platforms: [.iOS(.v17)],
     products: [
-        .library(name: "AppRoutes", targets: ["AppRoutes"]),
+        .library(name: "NavigationCore", targets: ["NavigationCore"]),
         .library(name: "NavigatorDependency", targets: ["NavigatorDependency"]),
+        .library(name: "RefPicker", targets: ["RefPicker"]),
         .library(name: "IssuesDomain", targets: ["IssuesDomain"]),
         .library(name: "ScreenBFeature", targets: ["ScreenBFeature"]),
         .library(name: "ScreenCKit", targets: ["ScreenCKit"]),
@@ -17,22 +18,40 @@ let package = Package(
         .package(url: "https://github.com/pointfreeco/swift-navigation", from: "2.7.0"),
     ],
     targets: [
-        // Leaf module: the only thing every feature depends on. No feature imports another feature.
-        .target(name: "AppRoutes"),
+        // Shared navigation vocabulary. The only module features share — no feature imports another.
+        .target(name: "NavigationCore"),
 
         .target(
             name: "NavigatorDependency",
             dependencies: [
-                "AppRoutes",
+                "NavigationCore",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]
         ),
 
+        // Shared UI component: a list of references with "Add Reference". Knows only NavigationCore.
+        .target(
+            name: "RefPicker",
+            dependencies: [
+                "NavigationCore",
+                "NavigatorDependency",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ]
+        ),
+
+        // Each feature's own routes. Imported only by that feature.
+        .target(name: "IssuesNavigationContract", dependencies: ["NavigationCore"]),
+        .target(name: "ScreenBNavigationContract", dependencies: ["NavigationCore"]),
+        .target(name: "ScreenCNavigationContract", dependencies: ["NavigationCore"]),
+        .target(name: "ScreenDNavigationContract", dependencies: ["NavigationCore"]),
+
         .target(
             name: "IssuesDomain",
             dependencies: [
-                "AppRoutes",
+                "NavigationCore",
                 "NavigatorDependency",
+                "IssuesNavigationContract",
+                "RefPicker",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "UIKitNavigation", package: "swift-navigation"),
             ]
@@ -40,22 +59,46 @@ let package = Package(
         .target(
             name: "ScreenBFeature",
             dependencies: [
-                "AppRoutes",
+                "NavigationCore",
                 "NavigatorDependency",
+                "ScreenBNavigationContract",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "UIKitNavigation", package: "swift-navigation"),
             ]
         ),
+        .target(name: "ScreenCKit", dependencies: ["NavigationCore", "ScreenCNavigationContract"]),
+        .target(name: "ScreenDKit", dependencies: ["NavigationCore", "ScreenDNavigationContract"]),
 
+        .testTarget(name: "NavigationCoreTests", dependencies: ["NavigationCore"]),
+        .testTarget(
+            name: "RefPickerTests",
+            dependencies: [
+                "RefPicker",
+                "NavigationCore",
+                "NavigatorDependency",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ]
+        ),
+        .testTarget(
+            name: "FeatureNavigationTests",
+            dependencies: [
+                "NavigationCore",
+                "IssuesNavigationContract",
+                "IssuesDomain",
+                "ScreenBFeature",
+                "ScreenCKit",
+                "ScreenDKit",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ]
+        ),
         .testTarget(
             name: "IssuesDomainTests",
             dependencies: [
                 "IssuesDomain",
+                "NavigationCore",
+                "NavigatorDependency",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]
         ),
-
-        .target(name: "ScreenCKit", dependencies: ["AppRoutes"]),
-        .target(name: "ScreenDKit", dependencies: ["AppRoutes"]),
     ]
 )

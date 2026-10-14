@@ -1,13 +1,14 @@
-import AppRoutes
+import NavigationCore
 import UIKit
 
 public final class ScreenCViewController: UIViewController {
-    private let navigator: Navigator
-    private let context: ScreenCContext?
+    private let navigator: any Navigator
+    /// Set when opened with `.compose`: shown above a text field whose Send reports back.
+    private let prompt: String?
 
-    public init(navigator: Navigator, context: ScreenCContext? = nil) {
+    public init(navigator: any Navigator, prompt: String? = nil) {
         self.navigator = navigator
-        self.context = context
+        self.prompt = prompt
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -32,7 +33,7 @@ public final class ScreenCViewController: UIViewController {
         let pushLocalButton = UIButton(type: .system)
         pushLocalButton.setTitle("Push to Screen C2", for: .normal)
         pushLocalButton.addAction(
-            UIAction { [weak self, navigator] _ in
+            UIAction { [weak self] _ in
                 guard let self else { return }
                 navigationController?.pushViewController(ScreenC2ViewController(navigator: navigator), animated: true)
             },
@@ -40,7 +41,7 @@ public final class ScreenCViewController: UIViewController {
         )
 
         let stack = UIStackView(
-            arrangedSubviews: [heading] + makeContextViews() + [pushLocalButton] + makeButtons()
+            arrangedSubviews: [heading] + makeComposeViews() + [pushLocalButton] + makeButtons()
         )
         stack.axis = .vertical
         stack.spacing = 12
@@ -55,52 +56,49 @@ public final class ScreenCViewController: UIViewController {
         ])
     }
 
-    /// Views driven by the optional `ScreenCContext`: a subtitle handed in by whoever pushed us,
-    /// and a textfield whose Send button reports back through `context.output`.
-    private func makeContextViews() -> [UIView] {
-        guard let context else { return [] }
+    /// Compose mode: the caller's prompt, and a text field whose Send reports the text back as
+    /// `.message` — without leaving, so the user can send again before going back.
+    private func makeComposeViews() -> [UIView] {
+        guard let prompt else { return [] }
 
-        var views: [UIView] = []
-
-        if let subtitle = context.subtitle {
-            let subtitleLabel = UILabel()
-            subtitleLabel.text = subtitle
-            subtitleLabel.font = .preferredFont(forTextStyle: .subheadline)
-            subtitleLabel.textColor = .secondaryLabel
-            subtitleLabel.numberOfLines = 0
-            views.append(subtitleLabel)
-        }
+        let promptLabel = UILabel()
+        promptLabel.text = prompt
+        promptLabel.font = .preferredFont(forTextStyle: .subheadline)
+        promptLabel.textColor = .secondaryLabel
+        promptLabel.numberOfLines = 0
 
         let textField = UITextField()
         textField.placeholder = "Message to caller"
         textField.borderStyle = .roundedRect
         textField.widthAnchor.constraint(equalToConstant: 220).isActive = true
 
-        let sendButton = UIButton(type: .system)
-        sendButton.setTitle("Send", for: .normal)
-        sendButton.addAction(
-            UIAction { [output = context.output, weak textField] _ in
-                output(.textSubmitted(textField?.text ?? ""))
-            },
-            for: .touchUpInside
-        )
+        let sendButton = navigationButton("Send") { [navigator, weak textField] in
+            navigator.send(.message(textField?.text ?? ""))
+        }
 
         let row = UIStackView(arrangedSubviews: [textField, sendButton])
         row.axis = .horizontal
         row.spacing = 8
         row.alignment = .center
-        views.append(row)
 
-        return views
+        return [promptLabel, row]
     }
 
     private func makeButtons() -> [UIButton] {
-        Route.allCases.filter { $0 != .screenC }.map { route in
-            let button = UIButton(type: .system)
-            button.setTitle("Go to \(route.title)", for: .normal)
-            button.addAction(UIAction { [navigator] _ in navigator.push(route) }, for: .touchUpInside)
-            return button
-        }
+        [
+            navigationButton("Open Issues") { [navigator] in
+                navigator.push(NavigationRequest(intent: .browse(.issues)))
+            },
+            navigationButton("Pick an issue, then open it") { [navigator] in
+                navigator.present(NavigationRequest(intent: .selectSingle(.issues))) { result in
+                    guard case let .selectedEntity(issue) = result else { return }
+                    navigator.push(NavigationRequest(intent: .open(issue)))
+                }
+            },
+            navigationButton("Open Screen B · sheet") { [navigator] in
+                navigator.present(NavigationRequest(intent: .browse(.screenB)))
+            },
+        ]
     }
 
     @objc

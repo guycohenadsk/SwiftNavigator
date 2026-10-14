@@ -1,6 +1,6 @@
-import AppRoutes
 import ComposableArchitecture
 import Foundation
+import NavigationCore
 import NavigatorDependency
 
 @Reducer
@@ -12,21 +12,24 @@ public struct IssuesList {
         /// without any save action travelling back.
         @Shared(.issues) public var issues: IdentifiedArrayOf<Issue>
         @Presents public var detail: IssuesDetail.State?
-        /// Text handed back by Screen C through its context closure — the cross-module delegate demo.
-        public var screenCText: String?
+        /// Picker mode: tapping a row reports the issue to whoever opened the picker.
+        public var isPicker: Bool
+        /// The last text Screen C sent back from compose mode.
+        @SharedReader(.screenCText) public var screenCText
 
-        public init() {}
+        public init(isPicker: Bool = false) {
+            self.isPicker = isPicker
+        }
     }
 
     public enum Action {
-        case navigateButtonTapped(Route)
-        case presentButtonTapped(Route)
+        case pushTapped(NavigationTarget)
+        case presentTapped(NavigationTarget)
         case pushScreenCWithContextTapped
         case issueTapped(Issue.ID)
         case addIssueTapped
         case deleteIssues(IndexSet)
         case detail(PresentationAction<IssuesDetail.Action>)
-        case screenC(ScreenCOutput)
     }
 
     @Dependency(\.navigator) var navigator
@@ -38,34 +41,25 @@ public struct IssuesList {
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case let .navigateButtonTapped(route):
+            case let .pushTapped(target):
                 let navigator = navigator
-                return .run { _ in await navigator.push(route) }
+                return .run { _ in await navigator.push(NavigationRequest(intent: .browse(target))) }
 
-            case let .presentButtonTapped(route):
+            case let .presentTapped(target):
                 let navigator = navigator
-                return .run { _ in await navigator.present(route) }
+                return .run { _ in await navigator.present(NavigationRequest(intent: .browse(target))) }
 
             case .pushScreenCWithContextTapped:
                 let navigator = navigator
-                return .run { send in
-                    // The continuation lives only inside the context's output closure, which
-                    // travels with the pushed RouteEntry. When Screen C is popped the entry — and
-                    // with it the closure and continuation — deallocates, the stream finishes,
-                    // and this effect completes on its own.
-                    let outputs = AsyncStream<ScreenCOutput> { continuation in
-                        let context = ScreenCContext(
-                            subtitle: "I have been pushed from the issues list",
-                            output: { continuation.yield($0) }
-                        )
-                        Task { await navigator.push(.screenC(context)) }
-                    }
-                    for await output in outputs {
-                        await send(.screenC(output))
-                    }
-                }
+                return .run { _ in await Issues.pushScreenCWithContext(navigator: navigator) }
 
             case let .issueTapped(id):
+                if state.isPicker {
+                    guard let issue = state.issues[id: id] else { return .none }
+                    let picked = EntityRef(target: .issues, id: issue.id.uuidString, title: issue.rowTitle)
+                    let navigator = navigator
+                    return .run { _ in await navigator.complete(with: .selectedEntity(picked)) }
+                }
                 return open(id, in: &state)
 
             case .addIssueTapped:
@@ -84,10 +78,6 @@ public struct IssuesList {
                 return .none
 
             case .detail:
-                return .none
-
-            case let .screenC(.textSubmitted(text)):
-                state.screenCText = text
                 return .none
             }
         }

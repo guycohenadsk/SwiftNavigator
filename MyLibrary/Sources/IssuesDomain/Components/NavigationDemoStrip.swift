@@ -1,42 +1,45 @@
-import AppRoutes
 import SwiftUI
 
-/// The navigation POC, compressed into three lines that sit between the navigation bar and the
-/// screen's real content: push to any route, present any route, and push Screen C with a context
-/// payload that reports back.
-///
-/// Chips are generated from `Route.allCases`, which is what keeps the "any screen reaches any
-/// screen" claim hand-testable — adding a route to the catalog adds chips here with no edit.
+/// The cross-module navigation demo, compressed into a few labeled lines of chips between the
+/// navigation bar and the screen's real content. Every chip is written out by the screen that shows
+/// it — exactly how a real feature would call another one.
 struct NavigationDemoStrip: View {
-    var pushRoutes: [Route] = Route.allCases
-    var onPush: (Route) -> Void
-    var onPresent: ((Route) -> Void)?
-    var onPushScreenCWithContext: (() -> Void)?
-    var screenCText: String?
+    struct Line: Identifiable {
+        let label: String
+        let links: [Link]
+        var id: String { label }
+    }
+
+    struct Link: Identifiable {
+        let id = UUID()
+        let title: String
+        var isHighlighted = false
+        let action: () -> Void
+
+        init(_ title: String, isHighlighted: Bool = false, action: @escaping () -> Void) {
+            self.title = title
+            self.isHighlighted = isHighlighted
+            self.action = action
+        }
+    }
+
+    let lines: [Line]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            line("Push") {
-                ForEach(pushRoutes, id: \.self) { route in
-                    chip(route.title) { onPush(route) }
-                }
-            }
+            ForEach(lines) { line in
+                HStack(spacing: 8) {
+                    Text(line.label)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 54, alignment: .leading)
 
-            if let onPresent {
-                line("Present") {
-                    ForEach(Route.allCases, id: \.self) { route in
-                        chip(route.title) { onPresent(route) }
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 6) {
+                            ForEach(line.links) { chip($0) }
+                        }
                     }
-                }
-            }
-
-            if let onPushScreenCWithContext {
-                line("Context") {
-                    chip(
-                        screenCText.map { "Screen C said “\($0)”" } ?? "Push Screen C with context",
-                        isHighlighted: screenCText != nil,
-                        action: onPushScreenCWithContext
-                    )
+                    .scrollIndicators(.hidden)
                 }
             }
         }
@@ -45,36 +48,15 @@ struct NavigationDemoStrip: View {
         .background(Color(.secondarySystemBackground))
     }
 
-    private func line(
-        _ label: String,
-        @ViewBuilder content: () -> some View
-    ) -> some View {
-        HStack(spacing: 8) {
-            Text(label)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 54, alignment: .leading)
-
-            ScrollView(.horizontal) {
-                HStack(spacing: 6) { content() }
-            }
-            .scrollIndicators(.hidden)
-        }
-    }
-
-    private func chip(
-        _ title: String,
-        isHighlighted: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Text(title)
+    private func chip(_ link: Link) -> some View {
+        Button(action: link.action) {
+            Text(link.title)
                 .font(.caption.weight(.medium))
                 .lineLimit(1)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(isHighlighted ? Color.accentColor.opacity(0.18) : Color(.tertiarySystemBackground))
-                .foregroundStyle(isHighlighted ? Color.accentColor : .primary)
+                .background(link.isHighlighted ? Color.accentColor.opacity(0.18) : Color(.tertiarySystemBackground))
+                .foregroundStyle(link.isHighlighted ? Color.accentColor : .primary)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)

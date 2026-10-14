@@ -1,4 +1,3 @@
-import AppRoutes
 import ComposableArchitecture
 import SwiftUI
 
@@ -16,11 +15,8 @@ public struct ScreenB2View: View {
                     .foregroundStyle(.secondary)
             }
             Section("Navigate to") {
-                ForEach(Route.allCases.filter { $0 != .screenB }, id: \.self) { route in
-                    Button(route.title) {
-                        store.send(.navigateButtonTapped(route))
-                    }
-                }
+                Button("Issues") { store.send(.openIssuesTapped) }
+                Button("Screen D · sheet") { store.send(.openScreenDAsSheetTapped) }
             }
         }
         .navigationTitle("Screen B2")
