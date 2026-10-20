@@ -112,12 +112,12 @@ struct AppNavigatorTests {
         let log = ResultLog()
         navigator.push(NavigationRequest(intent: .compose(.screenC, prompt: "Hi")), onResult: log.handler)
 
-        navigator.send(.message("one"))
-        navigator.send(.message("two"))
+        navigator.send(.output(NavigationOutput("one")))
+        navigator.send(.output(NavigationOutput("two")))
         #expect(navigator.tabs[0].path.count == 1)
 
         navigator.pop()
-        #expect(log.results == [.message("one"), .message("two"), .dismissed])
+        #expect(log.results == [.output(NavigationOutput("one")), .output(NavigationOutput("two")), .dismissed])
     }
 
     @Test("send() from a modal's root reaches whoever presented it")
@@ -126,21 +126,21 @@ struct AppNavigatorTests {
         let log = ResultLog()
         navigator.present(NavigationRequest(intent: .compose(.screenC, prompt: "Hi")), onResult: log.handler)
 
-        navigator.send(.message("hi"))
+        navigator.send(.output(NavigationOutput("hi")))
 
-        #expect(log.results == [.message("hi")])
+        #expect(log.results == [.output(NavigationOutput("hi"))])
         #expect(navigator.modals.count == 1)
     }
 
-    @Test("Completing with a message delivers it, then leaves with .dismissed")
+    @Test("Completing with an output delivers it, then leaves with .dismissed")
     func completeWithMessage() {
         let navigator = makeNavigator()
         let log = ResultLog()
         navigator.push(screenC, onResult: log.handler)
 
-        navigator.complete(with: .message("bye"))
+        navigator.complete(with: .output(NavigationOutput("bye")))
 
-        #expect(log.results == [.message("bye"), .dismissed])
+        #expect(log.results == [.output(NavigationOutput("bye")), .dismissed])
         #expect(navigator.tabs[0].path.isEmpty)
     }
 
@@ -148,12 +148,26 @@ struct AppNavigatorTests {
     func pushForResultsStream() async {
         let navigator = makeNavigator()
         let results = navigator.pushForResults(NavigationRequest(intent: .compose(.screenC, prompt: "Hi")))
-        navigator.send(.message("one"))
+        navigator.send(.output(NavigationOutput("one")))
         navigator.pop()
 
         var received: [NavigationResult] = []
         for await result in results { received.append(result) }
-        #expect(received == [.message("one"), .dismissed])
+        #expect(received == [.output(NavigationOutput("one")), .dismissed])
+    }
+
+    @Test("pushForOutputs yields only outputs of the asked type and ends when the screen leaves")
+    func pushForOutputsStream() async {
+        let navigator = makeNavigator()
+        let outputs = navigator.pushForOutputs(NavigationRequest(intent: .compose(.screenC, prompt: "Hi")), as: String.self)
+        navigator.send(.output(NavigationOutput("one")))
+        navigator.send(.output(NavigationOutput(2)))
+        navigator.send(.output(NavigationOutput("three")))
+        navigator.pop()
+
+        var received: [String] = []
+        for await output in outputs { received.append(output) }
+        #expect(received == ["one", "three"])
     }
 
     @Test("pushForResult returns the picked entity once the pushed picker completes")
@@ -194,21 +208,47 @@ struct AppNavigatorTests {
         #expect(log.results == [.dismissed, .dismissed])
     }
 
-    @Test("A .perform deep link lands on the module's tab and runs its action instead of pushing")
-    func deepLinkPerform() {
+    @Test("A .perform deep link lands on the module's tab and hands the action to that tab's root")
+    func deepLinkPerform() async {
         let navigator = makeNavigator()
-        var performed: [NavigationRequest] = []
-        navigator.performAction = { performed.append($0) }
+        let rootActions = navigator.performedActions(for: .issues)   // the Issues tab root subscribes
         navigator.tabIndex = 1
         navigator.present(screenD)
 
-        let request = NavigationRequest(intent: .perform(.issues, action: "screenCContext"))
-        navigator.open(deepLink: request)
+        navigator.open(deepLink: NavigationRequest(intent: .perform(.issues, action: "screenCContext")))
 
         #expect(navigator.modals.isEmpty)
         #expect(navigator.tabIndex == 0)
         #expect(navigator.tabs[0].path.isEmpty)
-        #expect(performed == [request])
+        #expect(await rootActions.first { _ in true } == "screenCContext")
+    }
+
+    @Test("A .perform deep link skips screens pushed above the root and same-module screens on other stacks")
+    func deepLinkPerformOnlyRoot() async {
+        let navigator = makeNavigator()
+        let rootActions = navigator.performedActions(for: .issues)
+        navigator.push(NavigationRequest(intent: .browse(.issues)))
+        let pushedActions = navigator.performedActions(for: .issues)
+        navigator.tabIndex = 1
+        let otherTabActions = navigator.performedActions(for: .issues)
+
+        navigator.open(deepLink: NavigationRequest(intent: .perform(.issues, action: "go")))
+        navigator.open(deepLink: NavigationRequest(intent: .perform(.issues, action: "again")))
+
+        var received: [String] = []
+        for await action in rootActions.prefix(2) { received.append(action) }
+        #expect(received == ["go", "again"])
+        _ = (pushedActions, otherTabActions)   // kept alive, never fed
+    }
+
+    @Test("A .perform deep link that lands before the root subscribes is held until it does")
+    func deepLinkPerformBeforeSubscribe() async {
+        let navigator = makeNavigator()
+        navigator.open(deepLink: NavigationRequest(intent: .perform(.issues, action: "screenCContext")))
+
+        let rootActions = navigator.performedActions(for: .issues)
+
+        #expect(await rootActions.first { _ in true } == "screenCContext")
     }
 
     @Test("A deep link to a tab's own root just selects that tab")
@@ -235,22 +275,6 @@ struct AppCompositionTests {
     func everyTargetRegistered() throws {
         let registry = try AppComposition.makeRegistry()
         #expect(registry.registeredTargets == Set(NavigationTarget.allCases))
-    }
-
-    @Test("demoapp://issues?action=screenCContext pushes Screen C in compose mode on the Issues tab")
-    func screenCContextDeepLink() async throws {
-        let registry = try AppComposition.makeRegistry()
-        let navigator = makeNavigator()
-        navigator.performAction = { try? registry.perform($0, navigator: navigator) }
-        navigator.tabIndex = 1
-
-        navigator.open(deepLink: try DeepLinkParser.parse(#require(URL(string: "demoapp://issues?action=screenCContext"))))
-        for _ in 0..<20 where navigator.tabs[0].path.isEmpty { await Task.yield() }
-
-        #expect(navigator.tabIndex == 0)
-        #expect(navigator.tabs[0].path.map(\.request) == [
-            NavigationRequest(intent: .compose(.screenC, prompt: "I have been pushed from the issues list")),
-        ])
     }
 
     @Test("Every tab root resolves")

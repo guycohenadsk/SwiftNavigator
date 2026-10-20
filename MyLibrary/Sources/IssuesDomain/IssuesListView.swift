@@ -49,6 +49,7 @@ public struct IssuesListView: View {
             }
             .listStyle(.plain)
         }
+        .onAppear { store.send(.onAppear) }
         .navigationTitle(store.isPicker ? "Pick an issue" : "Issues")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

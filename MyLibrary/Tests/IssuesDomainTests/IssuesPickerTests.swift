@@ -2,6 +2,7 @@ import ComposableArchitecture
 import Foundation
 import NavigationCore
 import NavigatorDependency
+import ScreenCNavigationContract
 import Testing
 
 @testable import IssuesDomain
@@ -21,6 +22,14 @@ private final class CompletionSpy: Navigator {
     func pop() {}
     func popToRoot() {}
     func dismiss() {}
+
+    /// Feeds deep-link actions to whichever list subscribed.
+    private(set) var actionContinuation: AsyncStream<String>.Continuation?
+    func performedActions(for target: NavigationTarget) -> AsyncStream<String> {
+        let (stream, continuation) = AsyncStream<String>.makeStream()
+        actionContinuation = continuation
+        return stream
+    }
 }
 
 @MainActor
@@ -50,44 +59,80 @@ struct IssuesPickerTests {
 @MainActor
 @Suite("Issues list ⇄ Screen C context", .serialized)
 struct IssuesScreenCContextTests {
-    @Test("Every message Screen C sends lands in the header; leaving Screen C ends the effect")
-    func messagesReachHeader() async {
-        let spy = CompletionSpy()
-        let store = withDependencies {
+    private func makeStore(_ spy: CompletionSpy, state: IssuesList.State = IssuesList.State()) -> TestStoreOf<IssuesList> {
+        withDependencies {
             $0.defaultFileStorage = .inMemory
             $0.navigator = spy
         } operation: {
-            TestStore(initialState: IssuesList.State()) { IssuesList() }
+            TestStore(initialState: state) { IssuesList() }
         }
-        store.exhaustivity = .off   // the header is shared state written by the effect
+    }
+
+    private func send(_ output: ScreenCNavigationContract.Output, to spy: CompletionSpy) {
+        spy.pushedHandler?(.output(NavigationOutput(output)))
+    }
+
+    @Test("Every text Screen C sends arrives as a .screenC action; leaving Screen C ends the effect")
+    func outputsArriveAsActions() async {
+        let spy = CompletionSpy()
+        let store = makeStore(spy)
 
         await store.send(.pushScreenCWithContextTapped)
         while spy.pushedHandler == nil { await Task.yield() }
-        #expect(spy.pushed == [NavigationRequest(intent: .compose(.screenC, prompt: "I have been pushed from the issues list"))])
+        #expect(spy.pushed == [ScreenCNavigationContract.compose(prompt: "I have been pushed from the issues list")])
 
-        spy.pushedHandler?(.message("Hello"))
-        spy.pushedHandler?(.message("Hello again"))
+        send(.textSubmitted("Hello"), to: spy)
+        await store.receive(\.screenC, .textSubmitted("Hello")) { $0.screenCText = "Hello" }
+        send(.textSubmitted("Hello again"), to: spy)
+        await store.receive(\.screenC, .textSubmitted("Hello again")) { $0.screenCText = "Hello again" }
+
         spy.pushedHandler?(.dismissed)
         await store.finish()
-
-        #expect(store.state.screenCText == "Hello again")
     }
 
-    @Test("The deep-link action runs the same flow and fills the same header")
-    func deepLinkActionFillsHeader() async {
+    @Test("Outputs of another type are ignored")
+    func foreignOutputsIgnored() async {
         let spy = CompletionSpy()
-        await withDependencies {
-            $0.navigator = spy
-        } operation: {
-            @Shared(.screenCText) var screenCText
-            let flow = Task { await Issues.pushScreenCWithContext(navigator: spy) }
-            while spy.pushedHandler == nil { await Task.yield() }
+        let store = makeStore(spy)
 
-            spy.pushedHandler?(.message("From a link"))
-            spy.pushedHandler?(.dismissed)
-            await flow.value
+        await store.send(.pushScreenCWithContextTapped)
+        while spy.pushedHandler == nil { await Task.yield() }
 
-            #expect(screenCText == "From a link")
-        }
+        spy.pushedHandler?(.output(NavigationOutput("not a Screen C output")))
+        spy.pushedHandler?(.dismissed)
+        await store.finish()
+    }
+
+    @Test("The screenCContext deep-link action runs the same flow as the chip, in the same list")
+    func deepLinkActionRunsFlow() async {
+        let spy = CompletionSpy()
+        let store = makeStore(spy)
+
+        await store.send(.onAppear) { $0.isListeningForDeepLinks = true }
+        while spy.actionContinuation == nil { await Task.yield() }
+        await store.send(.onAppear)   // appearing again does not subscribe twice
+
+        spy.actionContinuation?.yield(Issues.screenCContextAction)
+        await store.receive(\.deepLinkAction)
+        while spy.pushedHandler == nil { await Task.yield() }
+        #expect(spy.pushed == [ScreenCNavigationContract.compose(prompt: "I have been pushed from the issues list")])
+
+        send(.textSubmitted("From a link"), to: spy)
+        await store.receive(\.screenC, .textSubmitted("From a link")) { $0.screenCText = "From a link" }
+        spy.pushedHandler?(.dismissed)
+
+        spy.actionContinuation?.yield("unknown")
+        await store.receive(\.deepLinkAction)
+        spy.actionContinuation?.finish()
+        await store.finish()
+        #expect(spy.pushed.count == 1)
+    }
+
+    @Test("A picker does not listen for deep-link actions")
+    func pickerIgnoresDeepLinks() async {
+        let spy = CompletionSpy()
+        let store = makeStore(spy, state: IssuesList.State(isPicker: true))
+        await store.send(.onAppear)
+        #expect(spy.actionContinuation == nil)
     }
 }

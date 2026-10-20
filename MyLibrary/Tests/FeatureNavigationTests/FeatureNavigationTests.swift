@@ -46,11 +46,6 @@ struct FeatureNavigationTests {
         }
     }
 
-    @Test("Issues declares the screenCContext deep-link action")
-    func issuesDeclaresAction() {
-        #expect(Issues.navigationRegistration.actions.keys.contains(Issues.screenCContextAction))
-    }
-
     @Test("Opening an issue that does not exist shows a not-found screen, not a crash")
     func unknownIssue() {
         let controller = withDependencies {

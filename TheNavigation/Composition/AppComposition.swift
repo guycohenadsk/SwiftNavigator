@@ -49,14 +49,6 @@ enum AppComposition {
             registry = NavigationRegistry()
         }
         prepareDependencies { $0.navigator = navigator }
-        navigator.performAction = { request in
-            do {
-                try registry.perform(request, navigator: navigator)
-            } catch {
-                // A deep link is user input: an unknown action is ignored, not a crash.
-                print("Ignoring deep link action \(request): \(error)")
-            }
-        }
 
         let resolve: (NavigationRequest) -> UIViewController = { request in
             do {

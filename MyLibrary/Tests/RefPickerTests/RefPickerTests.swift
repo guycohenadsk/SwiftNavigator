@@ -21,6 +21,7 @@ private final class NavigatorSpy: Navigator {
     func pop() {}
     func popToRoot() {}
     func dismiss() {}
+    func performedActions(for target: NavigationTarget) -> AsyncStream<String> { AsyncStream { $0.finish() } }
 }
 
 private let issue = EntityRef(target: .issues, id: "issue-2", title: "#931")

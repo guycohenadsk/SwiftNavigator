@@ -1,4 +1,5 @@
 import NavigationCore
+import ScreenCNavigationContract
 import UIKit
 
 public final class ScreenCViewController: UIViewController {
@@ -57,7 +58,7 @@ public final class ScreenCViewController: UIViewController {
     }
 
     /// Compose mode: the caller's prompt, and a text field whose Send reports the text back as
-    /// `.message` — without leaving, so the user can send again before going back.
+    /// `Output.textSubmitted` — without leaving, so the user can send again before going back.
     private func makeComposeViews() -> [UIView] {
         guard let prompt else { return [] }
 
@@ -73,7 +74,7 @@ public final class ScreenCViewController: UIViewController {
         textField.widthAnchor.constraint(equalToConstant: 220).isActive = true
 
         let sendButton = navigationButton("Send") { [navigator, weak textField] in
-            navigator.send(.message(textField?.text ?? ""))
+            navigator.send(.output(NavigationOutput(ScreenCNavigationContract.Output.textSubmitted(textField?.text ?? ""))))
         }
 
         let row = UIStackView(arrangedSubviews: [textField, sendButton])

@@ -11,6 +11,7 @@ private final class InertNavigator: Navigator {
     func pop() {}
     func popToRoot() {}
     func dismiss() {}
+    func performedActions(for target: NavigationTarget) -> AsyncStream<String> { AsyncStream { $0.finish() } }
 }
 
 @MainActor
@@ -47,36 +48,6 @@ struct NavigationRegistryTests {
     func unregistered() {
         #expect(throws: NavigationError.unregisteredTarget(.screenD)) {
             try NavigationRegistry().resolve(NavigationRequest(intent: .browse(.screenD)), navigator: InertNavigator())
-        }
-    }
-
-    @Test("perform runs the named action of the target's module")
-    func performRunsAction() throws {
-        var ran: [String] = []
-        let registry = NavigationRegistry()
-        try registry.register(NavigationRegistration(
-            target: .issues,
-            actions: ["go": { _ in ran.append("go") }],
-            resolver: { _, _ in UIViewController() }
-        ))
-
-        try registry.perform(NavigationRequest(intent: .perform(.issues, action: "go")), navigator: InertNavigator())
-
-        #expect(ran == ["go"])
-    }
-
-    @Test("perform rejects unknown actions and non-perform requests")
-    func performRejects() throws {
-        let registry = NavigationRegistry()
-        try registry.register(registration(.issues))
-        #expect(throws: NavigationError.unsupportedIntent) {
-            try registry.perform(NavigationRequest(intent: .perform(.issues, action: "nope")), navigator: InertNavigator())
-        }
-        #expect(throws: NavigationError.unsupportedIntent) {
-            try registry.perform(NavigationRequest(intent: .browse(.issues)), navigator: InertNavigator())
-        }
-        #expect(throws: NavigationError.unregisteredTarget(.screenB)) {
-            try registry.perform(NavigationRequest(intent: .perform(.screenB, action: "go")), navigator: InertNavigator())
         }
     }
 }

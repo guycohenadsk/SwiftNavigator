@@ -8,9 +8,6 @@ import UIKit
 extension Issues {
     public static let navigationRegistration = NavigationRegistration(
         target: IssuesNavigationContract.target,
-        actions: [
-            screenCContextAction: { navigator in Task { await pushScreenCWithContext(navigator: navigator) } },
-        ],
         resolver: { request, _ in try viewController(for: route(for: request)) }
     )
 

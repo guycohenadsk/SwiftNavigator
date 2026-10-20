@@ -31,10 +31,20 @@ struct NavigationRequestTests {
 
 @Suite("NavigationResult")
 struct NavigationResultTests {
-    @Test("Only .message is an update; everything else ends the handler")
+    @Test("Only .output is an update; everything else ends the handler")
     func finality() {
-        #expect(!NavigationResult.message("hi").isFinal)
+        #expect(!NavigationResult.output(NavigationOutput("hi")).isFinal)
         #expect(NavigationResult.dismissed.isFinal)
         #expect(NavigationResult.selectedEntity(EntityRef(target: .issues, id: "1", title: "")).isFinal)
+    }
+
+    @Test("An output reads back only as the type it was sent as")
+    func typedOutput() {
+        let result = NavigationResult.output(NavigationOutput(42))
+        #expect(result.output(as: Int.self) == 42)
+        #expect(result.output(as: String.self) == nil)
+        #expect(NavigationResult.dismissed.output(as: Int.self) == nil)
+        #expect(NavigationOutput(42) == NavigationOutput(42))
+        #expect(NavigationOutput(42) != NavigationOutput("42"))
     }
 }

@@ -61,8 +61,10 @@ final class AppNavigator: Navigator {
     var tabIndex = 0
     let tabs: [StackNavigator]
     @ObservationIgnored let tabRoots: [NavigationRequest]
-    /// Runs a `.perform` request's module action. Set by AppComposition, which owns the registry.
-    @ObservationIgnored var performAction: (NavigationRequest) -> Void = { _ in }
+    /// Who listens for deep-link actions: a target, and the stack whose root screen subscribed.
+    @ObservationIgnored private var actionSubscribers: [UUID: ActionSubscriber] = [:]
+    /// Deep-link actions that landed before their stack's root subscribed.
+    @ObservationIgnored private var pendingActions: [PendingAction] = []
 
     var modals: [ModalNavigator] = [] {
         didSet {
@@ -102,7 +104,7 @@ final class AppNavigator: Navigator {
 
     func complete(with result: NavigationResult) {
         guard result.isFinal else {
-            // A message is never final: deliver it, then leave with `.dismissed`.
+            // An output is never final: deliver it, then leave with `.dismissed`.
             send(result)
             complete(with: .dismissed)
             return
@@ -122,9 +124,26 @@ final class AppNavigator: Navigator {
     func popToRoot() { current.path.removeAll() }
     func dismiss() { _ = modals.popLast() }
 
+    func performedActions(for target: NavigationTarget) -> AsyncStream<String> {
+        let (stream, continuation) = AsyncStream<String>.makeStream()
+        let id = UUID()
+        let subscriber = ActionSubscriber(target: target, stack: current, isRoot: current.path.isEmpty, continuation: continuation)
+        actionSubscribers[id] = subscriber
+        continuation.onTermination = { _ in
+            Task { @MainActor [weak self] in self?.actionSubscribers[id] = nil }
+        }
+        pendingActions.removeAll { pending in
+            guard subscriber.receives(pending.target, on: pending.stack) else { return false }
+            continuation.yield(pending.action)
+            return true
+        }
+        return stream
+    }
+
     /// Lands a deep link: dismiss modals, switch to the tab whose root is that module (if any) on a
     /// fresh stack, then push the request — unless that tab's root already is the request, or the
-    /// request asks the module to run one of its actions (`.perform`).
+    /// request asks the module to run one of its actions (`.perform`), which goes to the stack's
+    /// root screen through `performedActions(for:)`.
     func open(deepLink request: NavigationRequest) {
         modals = []
         if let tab = tabRoots.firstIndex(where: { $0.target == request.target }) {
@@ -132,10 +151,20 @@ final class AppNavigator: Navigator {
             tabs[tab].path = []
             if tabRoots[tab] == request { return }
         }
-        if case .perform = request.intent {
-            performAction(request)
+        if case let .perform(target, action) = request.intent {
+            deliver(action, to: target, on: current)
         } else {
             push(request)
+        }
+    }
+
+    /// Hands `action` to the root screen of `stack` listening for `target`, or holds it until one
+    /// subscribes.
+    private func deliver(_ action: String, to target: NavigationTarget, on stack: StackNavigator) {
+        if let subscriber = actionSubscribers.values.first(where: { $0.receives(target, on: stack) }) {
+            subscriber.continuation.yield(action)
+        } else {
+            pendingActions.append(PendingAction(target: target, stack: stack, action: action))
         }
     }
 
@@ -149,4 +178,25 @@ final class AppNavigator: Navigator {
             }
         }
     }
+}
+
+/// A screen listening for its module's deep-link actions, and the stack it subscribed on.
+private struct ActionSubscriber {
+    let target: NavigationTarget
+    let stack: StackNavigator
+    /// Whether the screen was its stack's root when it subscribed. Only roots receive actions: a
+    /// deep link lands on a fresh stack, so screens pushed above the root are on their way out.
+    let isRoot: Bool
+    let continuation: AsyncStream<String>.Continuation
+
+    func receives(_ target: NavigationTarget, on stack: StackNavigator) -> Bool {
+        isRoot && self.target == target && self.stack === stack
+    }
+}
+
+/// A deep-link action waiting for its stack's root to subscribe.
+private struct PendingAction {
+    let target: NavigationTarget
+    let stack: StackNavigator
+    let action: String
 }

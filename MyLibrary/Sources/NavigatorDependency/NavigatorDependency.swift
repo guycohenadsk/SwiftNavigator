@@ -42,4 +42,9 @@ private struct UnimplementedNavigator: Navigator {
     func dismiss() {
         assertionFailure("Dismissed before AppComposition installed a live Navigator.")
     }
+
+    func performedActions(for target: NavigationTarget) -> AsyncStream<String> {
+        assertionFailure("Subscribed to \(target)'s deep-link actions before AppComposition installed a live Navigator.")
+        return AsyncStream { $0.finish() }
+    }
 }

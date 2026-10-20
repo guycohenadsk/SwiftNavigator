@@ -22,10 +22,10 @@
 
 | ✅ | Capability |
 |---|---|
-| **Features never import each other** | Every feature imports `NavigationCore` (plus `NavigatorDependency` for TCA) and its own contract. Nothing else. |
+| **Features never import each other** | Every feature imports `NavigationCore` (plus `NavigatorDependency` for TCA), its own contract, and the contracts of screens whose outputs it reads. Never another feature. |
 | **Semantic intents** | A request is `.open(EntityRef)`, `.browse(target)`, `.selectSingle(target)`, or `.compose(target, prompt:)` — the same four for every module. |
 | **Module-owned registration** | Each feature declares `<X>.navigationRegistration`; the app shell only lists them. No screen switch anywhere. |
-| **Results across modules** | `push`/`present(_:onResult:)` + `send(_:)` / `complete(with:)`. A handler gets any `.message` updates, then exactly one final result — `.dismissed` included on swipe-back, swipe-down, or deep-link reset. |
+| **Results across modules** | `push`/`present(_:onResult:)` + `send(_:)` / `complete(with:)`. A handler gets any `.output` updates (typed by the sender's contract, e.g. `ScreenCNavigationContract.Output`), then exactly one final result — `.dismissed` included on swipe-back, swipe-down, or deep-link reset. |
 | **One pipeline** | Button taps, tab roots, and deep links all become a `NavigationRequest` → registry → owning module. |
 | **Tabs + endless modals** | Every tab and every modal is the same small `StackNavigator`; any screen can push or present any screen, forever. |
 | **Fails loudly** | Duplicate registrations throw; a test checks every `NavigationTarget` is registered; `scripts/check-boundaries.sh` audits imports. |
@@ -113,9 +113,9 @@ flowchart TB
 | Layer | Owns | Imports |
 |-------|------|---------|
 | **NavigationCore** 🍃 | The shared vocabulary: targets, intents, requests, results, `Navigator`, registry, deep-link parser | Nothing in this package |
-| **`<X>NavigationContract`** | That module's `target` and its own `Route` enum | `NavigationCore` — and only module X imports it |
+| **`<X>NavigationContract`** | That module's `target`, its own `Route` enum, and the `Output` values it sends back | `NavigationCore` — imported by module X, and by callers that read X's outputs |
 | **RefPicker** | Shared component: a reference list with **Add Reference** — opens with `.open`, adds by pushing `.selectSingle` (`pushForResult`) | `NavigationCore`, `NavigatorDependency` |
-| **Feature** 🧱 | Screens, `route(for:)`, `<X>.navigationRegistration` | `NavigationCore`, `NavigatorDependency` (TCA), `RefPicker`, its own contract |
+| **Feature** 🧱 | Screens, `route(for:)`, `<X>.navigationRegistration` | `NavigationCore`, `NavigatorDependency` (TCA), `RefPicker`, its own contract, contracts whose outputs it reads |
 | **App target** 📱 | Which modules and tabs exist, `AppNavigator`, URL handling | Everything (and that's its only job) |
 
 **Adding a screen** to a feature touches only that feature. **Adding a module** adds one `NavigationTarget` case in the core and one line in `AppComposition.registrations` — and the composition test fails until the second is done.
@@ -131,7 +131,7 @@ public enum NavigationIntent: Hashable, Codable {
     case open(EntityRef)                  // show one entity
     case browse(NavigationTarget)         // show the module's main screen
     case selectSingle(NavigationTarget)   // pick one entity and report it back
-    case compose(NavigationTarget, prompt: String)   // ask for text; replies come as .message
+    case compose(NavigationTarget, prompt: String)   // ask for text; replies come as typed .output
 }
 
 public enum NavigationResult { case selectedEntity(EntityRef), message(String), dismissed }
@@ -211,9 +211,11 @@ demoapp://<target>/<id>            → .open(EntityRef(target, id)) e.g. demoapp
 demoapp://<target>?action=<name>   → .perform(target, action:)    e.g. demoapp://issues?action=screenCContext
 ```
 
-`.perform` runs a named action the module declares in its registration (`actions:`). Issues declares
-`screenCContext`: the link lands on the Issues tab and runs the same code as the **Push Screen C with
-context** chip, so Send fills the Issues header just like the in-app flow.
+`.perform` hands the action name to the module's screen at the root of the tab it lands on, through
+`Navigator.performedActions(for:)`. The Issues list subscribes when it first appears and turns
+`screenCContext` into a `.deepLinkAction`, which runs the same code as the **Push Screen C with
+context** chip, so Send fills the Issues header just like the in-app flow. A link that arrives before
+the list subscribes (cold launch) is held until it does.
 
 One fixed landing rule: dismiss modals → switch to the tab whose root is that module (if any) and reset it → push the request (unless that tab's root already is the request). Invalid links are ignored.
 

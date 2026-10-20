@@ -4,9 +4,9 @@ public typealias NavigationResultHandler = @MainActor @Sendable (NavigationResul
 /// `NavigationRequest`; they never import each other or the registry.
 @MainActor
 public protocol Navigator: Sendable {
-    /// Pushes onto the current stack. `onResult` gets any `.message` updates, then one final result.
+    /// Pushes onto the current stack. `onResult` gets any `.output` updates, then one final result.
     func push(_ request: NavigationRequest, onResult: NavigationResultHandler?)
-    /// Presents in a new modal stack. `onResult` gets any `.message` updates, then one final result.
+    /// Presents in a new modal stack. `onResult` gets any `.output` updates, then one final result.
     func present(_ request: NavigationRequest, onResult: NavigationResultHandler?)
     /// Called by the top screen: sends an update to whoever opened it, and stays on screen.
     func send(_ result: NavigationResult)
@@ -15,6 +15,10 @@ public protocol Navigator: Sendable {
     func pop()
     func popToRoot()
     func dismiss()
+    /// The deep-link action names (`.perform(target, action:)`) for `target`, delivered to the
+    /// screen at the root of the stack the link lands on. Subscribe once from that screen and turn
+    /// each name into an action; a link that lands before anyone subscribes is held until then.
+    func performedActions(for target: NavigationTarget) -> AsyncStream<String>
 }
 
 extension Navigator {
@@ -36,6 +40,17 @@ extension Navigator {
         results { present(request, onResult: $0) }
     }
 
+    /// The typed updates of a pushed screen, e.g. `ScreenCNavigationContract.Output`. Ends when the
+    /// screen leaves; final results and updates of another type are skipped.
+    public func pushForOutputs<Output: Sendable>(_ request: NavigationRequest, as type: Output.Type) -> AsyncStream<Output> {
+        outputs(as: type) { push(request, onResult: $0) }
+    }
+
+    /// The typed updates of a presented screen. Ends when the screen leaves.
+    public func presentForOutputs<Output: Sendable>(_ request: NavigationRequest, as type: Output.Type) -> AsyncStream<Output> {
+        outputs(as: type) { present(request, onResult: $0) }
+    }
+
     /// The final result of a pushed screen, e.g. a picker's pick. Updates are skipped.
     public func pushForResult(_ request: NavigationRequest) async -> NavigationResult {
         await finalResult(of: pushForResults(request))
@@ -50,6 +65,18 @@ extension Navigator {
         let (stream, continuation) = AsyncStream<NavigationResult>.makeStream()
         open { result in
             continuation.yield(result)
+            if result.isFinal { continuation.finish() }
+        }
+        return stream
+    }
+
+    private func outputs<Output: Sendable>(
+        as type: Output.Type,
+        _ open: (@escaping NavigationResultHandler) -> Void
+    ) -> AsyncStream<Output> {
+        let (stream, continuation) = AsyncStream<Output>.makeStream()
+        open { result in
+            if let output = result.output(as: type) { continuation.yield(output) }
             if result.isFinal { continuation.finish() }
         }
         return stream
