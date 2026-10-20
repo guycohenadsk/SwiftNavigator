@@ -13,6 +13,10 @@ public final class IssuesListHostingController: UIHostingController<IssuesListVi
         self.store = store
         super.init(rootView: IssuesListView(store: store))
     }
+    
+    public override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+    }
 
     @available(*, unavailable)
     @MainActor

@@ -36,8 +36,8 @@ final class NavigationFlowUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Screen C"].isSelected)
     }
 
-    /// `demoapp://issues?action=screenCContext` from another tab: lands on the Issues tab, the Issues
-    /// module runs its own "push Screen C with context", and Send fills the Issues header.
+    /// `demoapp://issues?action=screenCContext` from another tab: lands on the Issues tab, whose root
+    /// list receives the action and pushes Screen C; Send fills that same list's header.
     @MainActor
     func testDeepLinkRunsScreenCContext() throws {
         app.tabBars.buttons["Screen B"].tap()
@@ -55,6 +55,7 @@ final class NavigationFlowUITests: XCTestCase {
 
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.buttons["Screen C said “From a link”"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars.buttons["Issues"].exists)   // the tab's root list, not a second one
     }
 
     /// Screen B presents the Issues picker with `.selectSingle(.issues)`; the picked issue comes back
@@ -104,7 +105,7 @@ final class NavigationFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS 'Plumbing riser leak'")).firstMatch.waitForExistence(timeout: 5))
     }
 
-    /// The Issues list pushes Screen C with `.compose`; each Send comes back as `.message`, Screen C
+    /// The Issues list pushes Screen C with `.compose`; each Send comes back as a typed output, Screen C
     /// stays up, and after popping back the Context chip shows the last text.
     @MainActor
     func testScreenCContextReportsBackToIssues() {

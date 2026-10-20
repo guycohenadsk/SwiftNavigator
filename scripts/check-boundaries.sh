@@ -5,7 +5,8 @@
 #   NavigationCore          imports nothing from this package
 #   <X>NavigationContract   imports NavigationCore only
 #   RefPicker               imports NavigationCore, NavigatorDependency (shared component)
-#   feature                 imports NavigationCore, NavigatorDependency, RefPicker, and its OWN contract only
+#   feature                 imports NavigationCore, NavigatorDependency, RefPicker, its own contract, and the
+#                           contracts of screens whose outputs it reads — never another feature
 set -euo pipefail
 cd "$(dirname "$0")/../MyLibrary/Sources"
 
@@ -26,7 +27,7 @@ check NavigationCore
 check NavigatorDependency NavigationCore
 check RefPicker NavigationCore NavigatorDependency
 for contract in *NavigationContract; do check "$contract" NavigationCore; done
-check IssuesDomain   NavigationCore NavigatorDependency IssuesNavigationContract RefPicker
+check IssuesDomain   NavigationCore NavigatorDependency IssuesNavigationContract ScreenCNavigationContract RefPicker
 check ScreenBFeature NavigationCore NavigatorDependency ScreenBNavigationContract
 check ScreenCKit     NavigationCore ScreenCNavigationContract
 check ScreenDKit     NavigationCore ScreenDNavigationContract

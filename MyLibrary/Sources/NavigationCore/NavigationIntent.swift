@@ -7,9 +7,10 @@ public enum NavigationIntent: Hashable, Codable, Sendable {
     case browse(NavigationTarget)
     /// Let the user pick one entity of the module and report it back.
     case selectSingle(NavigationTarget)
-    /// Ask the module for text, showing `prompt`. Replies arrive as `.message` updates.
+    /// Ask the module for text, showing `prompt`. Replies arrive as `.output` updates, typed
+    /// by the module's contract.
     case compose(NavigationTarget, prompt: String)
-    /// Ask the module to run one of its named actions (`NavigationRegistration.actions`), e.g. from
-    /// `demoapp://issues?action=screenCContext`.
+    /// Ask the module to run one of its named actions, e.g. from
+    /// `demoapp://issues?action=screenCContext`. Delivered through `Navigator.performedActions(for:)`.
     case perform(NavigationTarget, action: String)
 }

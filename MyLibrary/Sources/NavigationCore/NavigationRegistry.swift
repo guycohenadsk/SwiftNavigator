@@ -3,7 +3,6 @@ import UIKit
 @MainActor
 public final class NavigationRegistry {
     private var resolvers: [NavigationTarget: NavigationResolver] = [:]
-    private var actions: [NavigationTarget: [String: NavigationAction]] = [:]
 
     public init() {}
 
@@ -12,7 +11,6 @@ public final class NavigationRegistry {
             throw NavigationError.duplicateRegistration(registration.target)
         }
         resolvers[registration.target] = registration.resolver
-        actions[registration.target] = registration.actions
     }
 
     public var registeredTargets: Set<NavigationTarget> {
@@ -24,14 +22,5 @@ public final class NavigationRegistry {
             throw NavigationError.unregisteredTarget(request.target)
         }
         return try resolver(request, navigator)
-    }
-
-    /// Runs the action a `.perform` request names. Throws for any other intent, an unregistered
-    /// target, or an action the module does not declare.
-    public func perform(_ request: NavigationRequest, navigator: any Navigator) throws {
-        guard case let .perform(target, name) = request.intent else { throw NavigationError.unsupportedIntent }
-        guard let moduleActions = actions[target] else { throw NavigationError.unregisteredTarget(target) }
-        guard let action = moduleActions[name] else { throw NavigationError.unsupportedIntent }
-        action(navigator)
     }
 }

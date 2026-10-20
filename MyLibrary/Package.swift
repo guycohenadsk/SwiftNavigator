@@ -39,7 +39,8 @@ let package = Package(
             ]
         ),
 
-        // Each feature's own routes. Imported only by that feature.
+        // Each feature's routes and the values it sends back. Imported by that feature, and by
+        // callers that read those values — never a feature's implementation.
         .target(name: "IssuesNavigationContract", dependencies: ["NavigationCore"]),
         .target(name: "ScreenBNavigationContract", dependencies: ["NavigationCore"]),
         .target(name: "ScreenCNavigationContract", dependencies: ["NavigationCore"]),
@@ -51,6 +52,7 @@ let package = Package(
                 "NavigationCore",
                 "NavigatorDependency",
                 "IssuesNavigationContract",
+                "ScreenCNavigationContract",
                 "RefPicker",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "UIKitNavigation", package: "swift-navigation"),
@@ -96,6 +98,7 @@ let package = Package(
             dependencies: [
                 "IssuesDomain",
                 "NavigationCore",
+                "ScreenCNavigationContract",
                 "NavigatorDependency",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]

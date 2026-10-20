@@ -2,6 +2,7 @@ import ComposableArchitecture
 import Foundation
 import NavigationCore
 import NavigatorDependency
+import ScreenCNavigationContract
 
 @Reducer
 public struct IssuesList {
@@ -15,7 +16,10 @@ public struct IssuesList {
         /// Picker mode: tapping a row reports the issue to whoever opened the picker.
         public var isPicker: Bool
         /// The last text Screen C sent back from compose mode.
-        @SharedReader(.screenCText) public var screenCText
+        public var screenCText: String?
+        /// Whether this list already listens for the Issues deep-link actions — once per list, from
+        /// its first appearance.
+        var isListeningForDeepLinks = false
 
         public init(isPicker: Bool = false) {
             self.isPicker = isPicker
@@ -23,6 +27,7 @@ public struct IssuesList {
     }
 
     public enum Action {
+        case onAppear
         case pushTapped(NavigationTarget)
         case presentTapped(NavigationTarget)
         case pushScreenCWithContextTapped
@@ -30,6 +35,9 @@ public struct IssuesList {
         case addIssueTapped
         case deleteIssues(IndexSet)
         case detail(PresentationAction<IssuesDetail.Action>)
+        case screenC(ScreenCNavigationContract.Output)
+        /// A deep link's `?action=<name>`, delivered to the list at the root of the Issues tab.
+        case deepLinkAction(String)
     }
 
     @Dependency(\.navigator) var navigator
@@ -41,6 +49,22 @@ public struct IssuesList {
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
+            case .onAppear:
+                guard !state.isPicker, !state.isListeningForDeepLinks else { return .none }
+                state.isListeningForDeepLinks = true
+                let navigator = navigator
+                return .run { send in
+                    for await action in await navigator.performedActions(for: .issues) {
+                        await send(.deepLinkAction(action))
+                    }
+                }
+
+            case .deepLinkAction(Issues.screenCContextAction):
+                return pushScreenCWithContext()
+
+            case .deepLinkAction:
+                return .none
+
             case let .pushTapped(target):
                 let navigator = navigator
                 return .run { _ in await navigator.push(NavigationRequest(intent: .browse(target))) }
@@ -50,8 +74,7 @@ public struct IssuesList {
                 return .run { _ in await navigator.present(NavigationRequest(intent: .browse(target))) }
 
             case .pushScreenCWithContextTapped:
-                let navigator = navigator
-                return .run { _ in await Issues.pushScreenCWithContext(navigator: navigator) }
+                return pushScreenCWithContext()
 
             case let .issueTapped(id):
                 if state.isPicker {
@@ -74,15 +97,31 @@ public struct IssuesList {
             case .detail(.presented(.delegate(.deleteRequested))):
                 guard let id = state.detail?.issue.id else { return .none }
                 state.detail = nil
-                state.$issues.withLock { $0.remove(id: id) }
+                _ = state.$issues.withLock { $0.remove(id: id) }
                 return .none
 
             case .detail:
+                return .none
+
+            case let .screenC(.textSubmitted(text)):
+                state.screenCText = text
                 return .none
             }
         }
         .ifLet(\.$detail, action: \.detail) {
             IssuesDetail()
+        }
+    }
+
+    /// Pushes Screen C in compose mode; every text it sends comes back as a `.screenC` action. Ends
+    /// when Screen C leaves.
+    private func pushScreenCWithContext() -> Effect<Action> {
+        let navigator = navigator
+        return .run { send in
+            let request = ScreenCNavigationContract.compose(prompt: "I have been pushed from the issues list")
+            for await output in await navigator.pushForOutputs(request, as: ScreenCNavigationContract.Output.self) {
+                await send(.screenC(output))
+            }
         }
     }
 
