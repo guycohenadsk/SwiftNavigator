@@ -9,6 +9,7 @@ public struct NavigationRequest: Hashable, Codable, Sendable {
         case let .selectSingle(target): target
         case let .compose(target, _): target
         case let .perform(target, _): target
+        case let .screen(target, _): target
         }
     }
 

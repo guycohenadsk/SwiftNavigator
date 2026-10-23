@@ -17,8 +17,8 @@ public struct IssuesList {
         public var isPicker: Bool
         /// The last text Screen C sent back from compose mode.
         public var screenCText: String?
-        /// Whether this list already listens for the Issues deep-link actions — once per list, from
-        /// its first appearance.
+        /// Whether this list already listens for Issues deep links — once per list, from its first
+        /// appearance.
         var isListeningForDeepLinks = false
 
         public init(isPicker: Bool = false) {
@@ -36,8 +36,9 @@ public struct IssuesList {
         case deleteIssues(IndexSet)
         case detail(PresentationAction<IssuesDetail.Action>)
         case screenC(ScreenCNavigationContract.Output)
-        /// A deep link's `?action=<name>`, delivered to the list at the root of the Issues tab.
-        case deepLinkAction(String)
+        /// A deep link delivered to the list at the root of the Issues tab: an issue to open
+        /// (`demoapp://issues/<id>`), or an action (`?action=<name>`).
+        case incomingRequest(NavigationRequest)
     }
 
     @Dependency(\.navigator) var navigator
@@ -54,16 +55,22 @@ public struct IssuesList {
                 state.isListeningForDeepLinks = true
                 let navigator = navigator
                 return .run { send in
-                    for await action in await navigator.performedActions(for: .issues) {
-                        await send(.deepLinkAction(action))
+                    for await request in await navigator.incomingRequests(for: .issues) {
+                        await send(.incomingRequest(request))
                     }
                 }
 
-            case .deepLinkAction(Issues.screenCContextAction):
-                return pushScreenCWithContext()
-
-            case .deepLinkAction:
-                return .none
+            case let .incomingRequest(request):
+                switch request.intent {
+                case let .open(ref):
+                    // An unknown or deleted issue leaves the list as it is.
+                    guard let id = UUID(uuidString: ref.id) else { return .none }
+                    return open(id, in: &state)
+                case .perform(_, Issues.screenCContextAction):
+                    return pushScreenCWithContext()
+                default:
+                    return .none
+                }
 
             case let .pushTapped(target):
                 let navigator = navigator

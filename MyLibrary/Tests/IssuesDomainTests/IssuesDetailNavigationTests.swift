@@ -41,7 +41,7 @@ private final class DetailNavigatorSpy: Navigator {
     func pop() {}
     func popToRoot() {}
     func dismiss() {}
-    func performedActions(for target: NavigationTarget) -> AsyncStream<String> { AsyncStream { _ in } }
+    func incomingRequests(for target: NavigationTarget) -> AsyncStream<NavigationRequest> { AsyncStream { _ in } }
 }
 
 @MainActor

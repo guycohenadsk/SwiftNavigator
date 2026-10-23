@@ -32,10 +32,12 @@ public protocol Navigator: Sendable {
     /// Removes the entry `id` and everything pushed above it, wherever it is. Used by a parent
     /// whose child state went away. Does nothing if the entry is already gone.
     func remove(_ id: NavigationEntry.ID)
-    /// The deep-link action names (`.perform(target, action:)`) for `target`, delivered to the
-    /// screen at the root of the stack the link lands on. Subscribe once from that screen and turn
-    /// each name into an action; a link that lands before anyone subscribes is held until then.
-    func performedActions(for target: NavigationTarget) -> AsyncStream<String>
+    /// Deep links for `target` that its root screen handles itself: `.perform` actions, and requests
+    /// its registration sends to the root (`deepLinksToRoot`, e.g. Issues' `.open`, so a linked issue
+    /// opens as a child of the list). Delivered to the screen at the root of the stack the link lands
+    /// on. Subscribe once from that screen and turn each request into an action; a link that lands
+    /// before anyone subscribes is held until then.
+    func incomingRequests(for target: NavigationTarget) -> AsyncStream<NavigationRequest>
 }
 
 extension Navigator {

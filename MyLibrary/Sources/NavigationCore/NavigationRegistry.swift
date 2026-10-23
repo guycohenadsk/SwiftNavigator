@@ -3,6 +3,7 @@ import UIKit
 @MainActor
 public final class NavigationRegistry {
     private var resolvers: [NavigationTarget: NavigationResolver] = [:]
+    private var deepLinksToRoot: [NavigationTarget: @MainActor @Sendable (NavigationRequest) -> Bool] = [:]
 
     public init() {}
 
@@ -11,6 +12,12 @@ public final class NavigationRegistry {
             throw NavigationError.duplicateRegistration(registration.target)
         }
         resolvers[registration.target] = registration.resolver
+        deepLinksToRoot[registration.target] = registration.deepLinksToRoot
+    }
+
+    /// Whether the module `request` targets wants this deep link handed to its root screen.
+    public func deepLinksToRoot(_ request: NavigationRequest) -> Bool {
+        deepLinksToRoot[request.target]?(request) ?? false
     }
 
     public var registeredTargets: Set<NavigationTarget> {

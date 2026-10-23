@@ -8,6 +8,11 @@ import UIKit
 extension Issues {
     public static let navigationRegistration = NavigationRegistration(
         target: IssuesNavigationContract.target,
+        // A linked issue (`demoapp://issues/<id>`) opens as a child of the tab's list, so the list
+        // owns its state like a tapped row's — not as a standalone detail.
+        deepLinksToRoot: { request in
+            if case .open = request.intent { true } else { false }
+        },
         resolver: { request, _ in try viewController(for: route(for: request)) }
     )
 
@@ -22,7 +27,7 @@ extension Issues {
         case let .open(ref): return .details(id: ref.id)
         case .browse: return .list
         case .selectSingle: return .picker
-        case .compose, .perform: throw NavigationError.unsupportedIntent
+        case .compose, .perform, .screen: throw NavigationError.unsupportedIntent
         }
     }
 
@@ -46,8 +51,9 @@ extension Issues {
     }
 }
 
-/// Issue details opened from outside the list (another module, or a deep link). The list normally
-/// owns deletion; here this wrapper does it, then closes the screen.
+/// Issue details opened by another module (Screen B, Screen C, RefPicker) on a stack with no Issues
+/// list under it. Deep links don't come here: they open inside the tab's list (`deepLinksToRoot`).
+/// The list normally owns deletion; here this wrapper does it, then closes the screen.
 @Reducer
 struct StandaloneIssueDetail {
     @ObservableState

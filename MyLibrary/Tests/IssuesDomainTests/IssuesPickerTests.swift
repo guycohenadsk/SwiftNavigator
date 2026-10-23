@@ -25,12 +25,12 @@ private final class CompletionSpy: Navigator {
     func dismiss() {}
 
     /// Feeds deep-link actions to whichever list subscribed.
-    private(set) var actionContinuation: AsyncStream<String>.Continuation?
+    private(set) var actionContinuation: AsyncStream<NavigationRequest>.Continuation?
     func push(local request: NavigationRequest, from origin: UIViewController, screen: @escaping @MainActor () -> UIViewController, onDismiss: @escaping @MainActor () -> Void) -> NavigationEntry.ID { NavigationEntry.ID() }
     func remove(_ id: NavigationEntry.ID) {}
 
-    func performedActions(for target: NavigationTarget) -> AsyncStream<String> {
-        let (stream, continuation) = AsyncStream<String>.makeStream()
+    func incomingRequests(for target: NavigationTarget) -> AsyncStream<NavigationRequest> {
+        let (stream, continuation) = AsyncStream<NavigationRequest>.makeStream()
         actionContinuation = continuation
         return stream
     }
@@ -68,7 +68,9 @@ struct IssuesScreenCContextTests {
             $0.defaultFileStorage = .inMemory
             $0.navigator = spy
         } operation: {
-            TestStore(initialState: state) { IssuesList() }
+            @Shared(.issues) var issues
+            $issues.withLock { $0 = Issue.seed }
+            return TestStore(initialState: state) { IssuesList() }
         }
     }
 
@@ -116,8 +118,8 @@ struct IssuesScreenCContextTests {
         while spy.actionContinuation == nil { await Task.yield() }
         await store.send(.onAppear)   // appearing again does not subscribe twice
 
-        spy.actionContinuation?.yield(Issues.screenCContextAction)
-        await store.receive(\.deepLinkAction)
+        spy.actionContinuation?.yield(NavigationRequest(intent: .perform(.issues, action: Issues.screenCContextAction)))
+        await store.receive(\.incomingRequest)
         while spy.pushedHandler == nil { await Task.yield() }
         #expect(spy.pushed == [ScreenCNavigationContract.compose(prompt: "I have been pushed from the issues list")])
 
@@ -125,11 +127,35 @@ struct IssuesScreenCContextTests {
         await store.receive(\.screenC, .textSubmitted("From a link")) { $0.screenCText = "From a link" }
         spy.pushedHandler?(.dismissed)
 
-        spy.actionContinuation?.yield("unknown")
-        await store.receive(\.deepLinkAction)
+        spy.actionContinuation?.yield(NavigationRequest(intent: .perform(.issues, action: "unknown")))
+        await store.receive(\.incomingRequest)
         spy.actionContinuation?.finish()
         await store.finish()
         #expect(spy.pushed.count == 1)
+    }
+
+    @Test("A linked issue opens as the list's own detail; an unknown one leaves the list alone")
+    func deepLinkedIssueOpensInList() async throws {
+        let spy = CompletionSpy()
+        let store = makeStore(spy)
+        @Shared(.issues) var issues
+        let issue = try #require(issues.first)
+
+        await store.send(.onAppear) { $0.isListeningForDeepLinks = true }
+        while spy.actionContinuation == nil { await Task.yield() }
+
+        spy.actionContinuation?.yield(NavigationRequest(intent: .open(EntityRef(target: .issues, id: "not-a-uuid", title: ""))))
+        await store.receive(\.incomingRequest)
+        spy.actionContinuation?.yield(NavigationRequest(intent: .open(EntityRef(target: .issues, id: UUID().uuidString, title: ""))))
+        await store.receive(\.incomingRequest)
+
+        spy.actionContinuation?.yield(NavigationRequest(intent: .open(Issues.ref(for: issue))))
+        await store.receive(\.incomingRequest) {
+            $0.detail = IssuesDetail.State(issue: Shared($0.$issues[id: issue.id])!)
+        }
+
+        spy.actionContinuation?.finish()
+        await store.finish()
     }
 
     @Test("A picker does not listen for deep-link actions")

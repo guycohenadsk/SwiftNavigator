@@ -49,6 +49,10 @@ enum AppComposition {
             registry = NavigationRegistry()
         }
         prepareDependencies { $0.navigator = navigator }
+        navigator.deepLinksToRoot = { request in
+            if case .perform = request.intent { return true }
+            return registry.deepLinksToRoot(request)
+        }
 
         let resolve: (NavigationRequest) -> UIViewController = { request in
             do {

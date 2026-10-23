@@ -10,6 +10,7 @@ struct NavigationRequestTests {
         #expect(NavigationRequest(intent: .browse(.screenB)).target == .screenB)
         #expect(NavigationRequest(intent: .selectSingle(.screenC)).target == .screenC)
         #expect(NavigationRequest(intent: .compose(.screenC, prompt: "Hi")).target == .screenC)
+        #expect(NavigationRequest(intent: .screen(.screenB, name: "b2")).target == .screenB)
     }
 
     @Test(
@@ -20,6 +21,7 @@ struct NavigationRequestTests {
             .selectSingle(.issues),
             .compose(.screenC, prompt: "Hi"),
             .perform(.issues, action: "go"),
+            .screen(.screenB, name: "b2"),
         ]
     )
     func codableRoundTrip(intent: NavigationIntent) throws {

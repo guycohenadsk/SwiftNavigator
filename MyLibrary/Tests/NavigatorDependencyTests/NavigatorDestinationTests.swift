@@ -45,7 +45,7 @@ final class LocalPushSpy: Navigator {
     func pop() {}
     func popToRoot() {}
     func dismiss() {}
-    func performedActions(for target: NavigationTarget) -> AsyncStream<String> { AsyncStream { $0.finish() } }
+    func incomingRequests(for target: NavigationTarget) -> AsyncStream<NavigationRequest> { AsyncStream { $0.finish() } }
 }
 
 struct Child: Equatable {

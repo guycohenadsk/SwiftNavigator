@@ -22,6 +22,27 @@ final class NavigationFlowUITests: XCTestCase {
 
         XCTAssertTrue(app.navigationBars["#931"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.tabBars.buttons["Issues"].isSelected)
+
+        // Opened by the tab's list, as its own child: back lands on that list.
+        app.navigationBars["#931"].buttons["BackButton"].tap()
+        XCTAssertTrue(app.navigationBars["Issues"].waitForExistence(timeout: 5))
+    }
+
+    /// Deleting a deep-linked issue is handled by the list it opened in, as for a tapped row. Uses
+    /// seed issue #904, which no other test opens; it stays deleted until the app is reinstalled.
+    @MainActor
+    func testDeleteDeepLinkedIssueReturnsToList() throws {
+        app.tabBars.buttons["Screen D"].tap()
+        app.open(try XCTUnwrap(URL(string: "demoapp://issues/00000000-0000-0000-0000-000000000003")))
+        confirmOpenInAppIfAsked()
+        XCTAssertTrue(app.navigationBars["#904"].waitForExistence(timeout: 5))
+
+        app.buttons["more_actions_button"].tap()
+        app.buttons["Delete"].tap()
+        app.alerts.buttons["Delete"].tap()
+
+        XCTAssertTrue(app.navigationBars["Issues"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons.containing(NSPredicate(format: "label CONTAINS 'Electrical panel labeling'")).firstMatch.exists)
     }
 
     /// `demoapp://screenC` from another tab: Screen C is a tab root, so the link selects its tab.
@@ -209,6 +230,33 @@ final class NavigationFlowUITests: XCTestCase {
 
         app.navigationBars["Screen C"].buttons["BackButton"].tap()
         XCTAssertTrue(app.navigationBars["#928"].waitForExistence(timeout: 5))
+    }
+
+    /// Screen B pushes B2 through the navigator; back returns to Screen B, and B2 opens again.
+    @MainActor
+    func testScreenB2BackThenReopen() {
+        app.tabBars.buttons["Screen B"].tap()
+
+        app.buttons["Push to Screen B2"].tap()
+        XCTAssertTrue(app.navigationBars["Screen B2"].waitForExistence(timeout: 5))
+        app.navigationBars["Screen B2"].buttons["BackButton"].tap()
+        XCTAssertTrue(app.navigationBars["Screen B"].waitForExistence(timeout: 5))
+
+        app.buttons["Push to Screen B2"].tap()
+        XCTAssertTrue(app.navigationBars["Screen B2"].waitForExistence(timeout: 5))
+    }
+
+    /// From B2, a cross-module push (Issues) stacks on top, and back returns to B2.
+    @MainActor
+    func testCrossModulePushFromScreenB2() {
+        app.tabBars.buttons["Screen B"].tap()
+        app.buttons["Push to Screen B2"].tap()
+        XCTAssertTrue(app.navigationBars["Screen B2"].waitForExistence(timeout: 5))
+
+        inScreenButton("Issues").tap()
+        XCTAssertTrue(app.navigationBars["Issues"].waitForExistence(timeout: 5))
+        app.navigationBars["Issues"].buttons["BackButton"].tap()
+        XCTAssertTrue(app.navigationBars["Screen B2"].waitForExistence(timeout: 5))
     }
 
     /// The first time a URL targets the app, iOS may ask for confirmation in SpringBoard.

@@ -211,7 +211,7 @@ struct AppNavigatorTests {
     @Test("A .perform deep link lands on the module's tab and hands the action to that tab's root")
     func deepLinkPerform() async {
         let navigator = makeNavigator()
-        let rootActions = navigator.performedActions(for: .issues)   // the Issues tab root subscribes
+        let rootActions = navigator.incomingRequests(for: .issues)   // the Issues tab root subscribes
         navigator.tabIndex = 1
         navigator.present(screenD)
 
@@ -220,24 +220,24 @@ struct AppNavigatorTests {
         #expect(navigator.modals.isEmpty)
         #expect(navigator.tabIndex == 0)
         #expect(navigator.tabs[0].path.isEmpty)
-        #expect(await rootActions.first { _ in true } == "screenCContext")
+        #expect(await rootActions.first { _ in true } == NavigationRequest(intent: .perform(.issues, action: "screenCContext")))
     }
 
     @Test("A .perform deep link skips screens pushed above the root and same-module screens on other stacks")
     func deepLinkPerformOnlyRoot() async {
         let navigator = makeNavigator()
-        let rootActions = navigator.performedActions(for: .issues)
+        let rootActions = navigator.incomingRequests(for: .issues)
         navigator.push(NavigationRequest(intent: .browse(.issues)))
-        let pushedActions = navigator.performedActions(for: .issues)
+        let pushedActions = navigator.incomingRequests(for: .issues)
         navigator.tabIndex = 1
-        let otherTabActions = navigator.performedActions(for: .issues)
+        let otherTabActions = navigator.incomingRequests(for: .issues)
 
         navigator.open(deepLink: NavigationRequest(intent: .perform(.issues, action: "go")))
         navigator.open(deepLink: NavigationRequest(intent: .perform(.issues, action: "again")))
 
-        var received: [String] = []
-        for await action in rootActions.prefix(2) { received.append(action) }
-        #expect(received == ["go", "again"])
+        var received: [NavigationRequest] = []
+        for await request in rootActions.prefix(2) { received.append(request) }
+        #expect(received == [NavigationRequest(intent: .perform(.issues, action: "go")), NavigationRequest(intent: .perform(.issues, action: "again"))])
         _ = (pushedActions, otherTabActions)   // kept alive, never fed
     }
 
@@ -246,9 +246,33 @@ struct AppNavigatorTests {
         let navigator = makeNavigator()
         navigator.open(deepLink: NavigationRequest(intent: .perform(.issues, action: "screenCContext")))
 
-        let rootActions = navigator.performedActions(for: .issues)
+        let rootActions = navigator.incomingRequests(for: .issues)
 
-        #expect(await rootActions.first { _ in true } == "screenCContext")
+        #expect(await rootActions.first { _ in true } == NavigationRequest(intent: .perform(.issues, action: "screenCContext")))
+    }
+
+    @Test("A deep link its module sends to the root lands on the module's tab and goes to that root, not the stack")
+    func deepLinkToRoot() async {
+        let navigator = makeNavigator()
+        navigator.deepLinksToRoot = { if case .open = $0.intent { true } else { false } }
+        let rootRequests = navigator.incomingRequests(for: .issues)
+        navigator.tabIndex = 1
+        navigator.present(screenD)
+
+        navigator.open(deepLink: NavigationRequest(intent: .open(issue)))
+
+        #expect(navigator.modals.isEmpty)
+        #expect(navigator.tabIndex == 0)
+        #expect(navigator.tabs[0].path.isEmpty)
+        #expect(await rootRequests.first { _ in true } == NavigationRequest(intent: .open(issue)))
+    }
+
+    @Test("A deep link sent to the root of a module without a tab is pushed on the current tab instead")
+    func deepLinkToRootWithoutTab() {
+        let navigator = makeNavigator()
+        navigator.deepLinksToRoot = { _ in true }
+        navigator.open(deepLink: screenD)
+        #expect(navigator.tabs[0].path.map(\.request) == [screenD])
     }
 
     @Test("A deep link to a tab's own root just selects that tab")
@@ -377,6 +401,14 @@ struct AppNavigatorLocalEntryTests {
 @MainActor
 @Suite("AppComposition")
 struct AppCompositionTests {
+    @Test("Issues sends linked issues to its tab's list; other links are resolved")
+    func registryDeepLinksToRoot() throws {
+        let registry = try AppComposition.makeRegistry()
+        #expect(registry.deepLinksToRoot(NavigationRequest(intent: .open(issue))))
+        #expect(!registry.deepLinksToRoot(NavigationRequest(intent: .browse(.issues))))
+        #expect(!registry.deepLinksToRoot(NavigationRequest(intent: .browse(.screenB))))
+    }
+
     @Test("Every NavigationTarget is registered exactly once")
     func everyTargetRegistered() throws {
         let registry = try AppComposition.makeRegistry()

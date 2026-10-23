@@ -10,7 +10,11 @@ public enum NavigationIntent: Hashable, Codable, Sendable {
     /// Ask the module for text, showing `prompt`. Replies arrive as `.output` updates, typed
     /// by the module's contract.
     case compose(NavigationTarget, prompt: String)
+    /// One of the module's own inner screens, named by the module (e.g. Screen B's `"b2"`). Pushed by
+    /// the module itself as a local entry (`Navigator.push(local:…)`), so the stack stays all data;
+    /// other modules have no reason to ask for it.
+    case screen(NavigationTarget, name: String)
     /// Ask the module to run one of its named actions, e.g. from
-    /// `demoapp://issues?action=screenCContext`. Delivered through `Navigator.performedActions(for:)`.
+    /// `demoapp://issues?action=screenCContext`. Delivered through `Navigator.incomingRequests(for:)`.
     case perform(NavigationTarget, action: String)
 }
