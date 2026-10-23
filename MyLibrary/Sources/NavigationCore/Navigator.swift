@@ -1,3 +1,5 @@
+import UIKit
+
 public typealias NavigationResultHandler = @MainActor @Sendable (NavigationResult) -> Void
 
 /// The only navigation seam a feature depends on. Features describe where to go with a
@@ -15,6 +17,21 @@ public protocol Navigator: Sendable {
     func pop()
     func popToRoot()
     func dismiss()
+    /// Pushes a screen whose state its parent owns (an in-module child, e.g. Issues list → detail)
+    /// onto the stack that holds `origin`, right on top. `request` names what it shows, so the entry
+    /// is data like any other; `screen` builds it from the parent's state. `onDismiss` fires once,
+    /// however the entry leaves — pop, swipe-back, deep-link reset, or an entry below it going —
+    /// but not when the parent removes it with `remove(_:)`. Returns the entry's id.
+    @discardableResult
+    func push(
+        local request: NavigationRequest,
+        from origin: UIViewController,
+        screen: @escaping @MainActor () -> UIViewController,
+        onDismiss: @escaping @MainActor () -> Void
+    ) -> NavigationEntry.ID
+    /// Removes the entry `id` and everything pushed above it, wherever it is. Used by a parent
+    /// whose child state went away. Does nothing if the entry is already gone.
+    func remove(_ id: NavigationEntry.ID)
     /// The deep-link action names (`.perform(target, action:)`) for `target`, delivered to the
     /// screen at the root of the stack the link lands on. Subscribe once from that screen and turn
     /// each name into an action; a link that lands before anyone subscribes is held until then.

@@ -122,6 +122,95 @@ final class NavigationFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Screen C said “Hello”"].waitForExistence(timeout: 5))
     }
 
+    // MARK: - Issues list → detail through the navigator
+
+    private func openCommissioningIssue() {
+        app.buttons.containing(NSPredicate(format: "label CONTAINS 'Commissioning'")).firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["#928"].waitForExistence(timeout: 5))
+    }
+
+    private var issuesListBar: XCUIElement { app.navigationBars["Issues"] }
+
+    /// The button labelled `label` above the tab bar — screens reuse tab names for their links.
+    private func inScreenButton(_ label: String) -> XCUIElement {
+        let tabBarTop = app.tabBars.firstMatch.frame.minY
+        let candidates = app.buttons.matching(NSPredicate(format: "label == %@", label)).allElementsBoundByIndex
+        return candidates.first { $0.frame.maxY < tabBarTop } ?? candidates[0]
+    }
+
+    /// Back button: the detail leaves, the list's detail state clears, and the same row opens again.
+    @MainActor
+    func testDetailBackButtonThenReopen() {
+        openCommissioningIssue()
+
+        app.navigationBars["#928"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(issuesListBar.waitForExistence(timeout: 5))
+
+        openCommissioningIssue()
+    }
+
+    /// Interactive swipe-back clears the list's detail state the same way.
+    @MainActor
+    func testDetailSwipeBackThenReopen() {
+        openCommissioningIssue()
+
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)))
+        XCTAssertTrue(issuesListBar.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["#928"].exists)
+
+        openCommissioningIssue()
+    }
+
+    /// Delete in the detail is handled by the list (its parent): the issue goes away and the
+    /// navigator entry is removed, landing back on the list. Deletes an issue it creates itself, so
+    /// the persisted seed issues other tests open stay put.
+    @MainActor
+    func testDeleteFromDetailReturnsToList() {
+        let newRows = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'New'"))
+        let before = newRows.count
+        app.buttons["add_issue_button"].tap()
+        XCTAssertTrue(app.navigationBars["New"].waitForExistence(timeout: 5))
+
+        app.buttons["more_actions_button"].tap()
+        app.buttons["Delete"].tap()
+        app.alerts.buttons["Delete"].tap()
+
+        XCTAssertTrue(issuesListBar.waitForExistence(timeout: 5))
+        XCTAssertEqual(newRows.count, before)
+    }
+
+    /// A deep link landing on the Issues tab while a detail is open resets the stack — the detail
+    /// included — and its list can open details again afterwards.
+    @MainActor
+    func testDeepLinkResetsOpenDetail() throws {
+        openCommissioningIssue()
+
+        XCUIDevice.shared.system.open(try XCTUnwrap(URL(string: "demoapp://issues?action=screenCContext")))
+        confirmOpenInAppIfAsked()
+
+        XCTAssertTrue(app.staticTexts["I have been pushed from the issues list"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(issuesListBar.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["#928"].exists)
+
+        openCommissioningIssue()
+    }
+
+    /// From a detail pushed by its list, a cross-module push (Screen C) stacks on top, and going
+    /// back returns to the same detail.
+    @MainActor
+    func testCrossModulePushFromDetail() {
+        openCommissioningIssue()
+
+        inScreenButton("Screen C").tap()   // the detail's push link, not the "Screen C" tab
+        XCTAssertTrue(app.navigationBars["Screen C"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Issues"].isSelected)
+
+        app.navigationBars["Screen C"].buttons["BackButton"].tap()
+        XCTAssertTrue(app.navigationBars["#928"].waitForExistence(timeout: 5))
+    }
+
     /// The first time a URL targets the app, iOS may ask for confirmation in SpringBoard.
     private func confirmOpenInAppIfAsked() {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")

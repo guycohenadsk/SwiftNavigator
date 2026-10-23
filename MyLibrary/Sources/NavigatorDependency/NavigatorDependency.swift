@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import NavigationCore
+import UIKit
 
 extension DependencyValues {
     public var navigator: any Navigator {
@@ -41,6 +42,20 @@ private struct UnimplementedNavigator: Navigator {
 
     func dismiss() {
         assertionFailure("Dismissed before AppComposition installed a live Navigator.")
+    }
+
+    func push(
+        local request: NavigationRequest,
+        from origin: UIViewController,
+        screen: @escaping @MainActor () -> UIViewController,
+        onDismiss: @escaping @MainActor () -> Void
+    ) -> NavigationEntry.ID {
+        assertionFailure("Pushed \(request) before AppComposition installed a live Navigator.")
+        return NavigationEntry.ID()
+    }
+
+    func remove(_ id: NavigationEntry.ID) {
+        assertionFailure("Removed an entry before AppComposition installed a live Navigator.")
     }
 
     func performedActions(for target: NavigationTarget) -> AsyncStream<String> {

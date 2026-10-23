@@ -1,6 +1,7 @@
 import Foundation
 import NavigationCore
 import Observation
+import UIKit
 
 /// One back stack — a tab's or a modal's. The same shape as navigation_contract's AppNavigator: a
 /// path, the result handlers of its entries, and a `didSet` that reports `.dismissed` for every
@@ -12,15 +13,43 @@ final class StackNavigator {
         didSet {
             let removedIDs = Set(oldValue.map(\.id)).subtracting(path.map(\.id))
             for id in removedIDs {
+                localScreens[id] = nil
                 handlers.removeValue(forKey: id)?(.dismissed)
             }
         }
     }
     @ObservationIgnored private var handlers: [UUID: NavigationResultHandler] = [:]
+    /// Builders of entries a parent pushed with `push(local:…)`; everything else goes through the
+    /// registry.
+    @ObservationIgnored private var localScreens: [UUID: @MainActor () -> UIViewController] = [:]
+    /// The UIKit stack bound to `path`, so a parent screen's pushes can find their stack.
+    @ObservationIgnored weak var controller: UINavigationController?
 
     func push(_ entry: NavigationEntry, onResult: NavigationResultHandler?) {
         handlers[entry.id] = onResult
         path.append(entry)
+    }
+
+    func push(local entry: NavigationEntry, screen: @escaping @MainActor () -> UIViewController, onDismiss: @escaping @MainActor () -> Void) {
+        localScreens[entry.id] = screen
+        push(entry) { result in
+            if case .dismissed = result { onDismiss() }
+        }
+    }
+
+    /// The screen of a local entry, or `nil` for entries the registry resolves.
+    func localScreen(for id: UUID) -> UIViewController? {
+        localScreens[id]?()
+    }
+
+    /// Removes `id` and everything above it. `id`'s own handler is dropped first — its parent asked
+    /// for this — while entries above still report `.dismissed`. Returns whether `id` was here.
+    @discardableResult
+    func remove(_ id: UUID) -> Bool {
+        guard let index = path.firstIndex(where: { $0.id == id }) else { return false }
+        handlers[id] = nil
+        path.removeSubrange(index...)
+        return true
     }
 
     /// Hands an update to whoever pushed the top entry, leaving it in place.
@@ -85,6 +114,14 @@ final class AppNavigator: Navigator {
     }
 
     private var current: StackNavigator { modals.last?.stack ?? tabs[tabIndex] }
+    private var allStacks: [StackNavigator] { tabs + modals.map(\.stack) }
+
+    /// The stack whose UIKit controller shows `origin`, so a parent's child lands next to it even if
+    /// another stack is on top. Falls back to the current stack for a screen not yet on one.
+    private func stack(holding origin: UIViewController) -> StackNavigator {
+        let controller = origin.navigationController ?? origin as? UINavigationController
+        return allStacks.first { $0.controller != nil && $0.controller === controller } ?? current
+    }
 
     func push(_ request: NavigationRequest, onResult: NavigationResultHandler?) {
         current.push(NavigationEntry(request: request), onResult: onResult)
@@ -118,6 +155,21 @@ final class AppNavigator: Navigator {
         } else {
             current.complete(with: result)
         }
+    }
+
+    func push(
+        local request: NavigationRequest,
+        from origin: UIViewController,
+        screen: @escaping @MainActor () -> UIViewController,
+        onDismiss: @escaping @MainActor () -> Void
+    ) -> NavigationEntry.ID {
+        let entry = NavigationEntry(request: request)
+        stack(holding: origin).push(local: entry, screen: screen, onDismiss: onDismiss)
+        return entry.id
+    }
+
+    func remove(_ id: NavigationEntry.ID) {
+        for stack in allStacks where stack.remove(id) { return }
     }
 
     func pop() { _ = current.path.popLast() }

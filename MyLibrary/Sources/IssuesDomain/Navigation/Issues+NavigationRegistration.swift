@@ -11,6 +11,11 @@ extension Issues {
         resolver: { request, _ in try viewController(for: route(for: request)) }
     )
 
+    /// How other modules, and the navigator's stack, refer to `issue`.
+    static func ref(for issue: Issue) -> EntityRef {
+        EntityRef(target: .issues, id: issue.id.uuidString, title: issue.rowTitle)
+    }
+
     static func route(for request: NavigationRequest) throws -> IssuesNavigationContract.Route {
         guard request.target == IssuesNavigationContract.target else { throw NavigationError.wrongTarget }
         switch request.intent {

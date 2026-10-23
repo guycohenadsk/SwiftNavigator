@@ -1,21 +1,20 @@
 import ComposableArchitecture
+import NavigationCore
+import NavigatorDependency
 import SwiftUI
 import UIKitNavigation
 
-/// Hosts `IssuesListView` and owns the in-module push to Issues Detail. Pushing via `UIKitNavigation`'s
-/// `UIViewController.navigationDestination(item:)` puts the pushed screen directly onto this
-/// controller's own `navigationController` — the same shared, per-tab stack the app already uses —
-/// so there's only ever one navigation bar, no nested `NavigationStack` required.
+/// Hosts `IssuesListView` and shows Issues Detail when the list's `detail` state is set. The push
+/// goes through the app's `Navigator` (`navigatorDestination`), so the detail is an entry on the
+/// tab's stack like any other screen — deep-link resets and `popToRoot` see it — while its state
+/// stays in `IssuesList.State.detail`, so the detail still talks to the list through `.ifLet`.
 public final class IssuesListHostingController: UIHostingController<IssuesListView> {
     @UIBindable var store: StoreOf<IssuesList>
+    @Dependency(\.navigator) private var navigator
 
     public init(store: StoreOf<IssuesList>) {
         self.store = store
         super.init(rootView: IssuesListView(store: store))
-    }
-    
-    public override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
     }
 
     @available(*, unavailable)
@@ -24,7 +23,12 @@ public final class IssuesListHostingController: UIHostingController<IssuesListVi
 
     public override func viewDidLoad() {
         super.viewDidLoad()
-        navigationDestination(item: $store.scope(\.detail, action: \.detail)) { store in
+        navigatorDestination(
+            item: $store.scope(\.detail, action: \.detail),
+            navigator: navigator,
+            id: { $0.issue.id },
+            request: { NavigationRequest(intent: .open(Issues.ref(for: $0.issue))) }
+        ) { store in
             UIHostingController(rootView: IssuesDetailView(store: store))
         }
     }

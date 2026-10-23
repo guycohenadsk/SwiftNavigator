@@ -76,7 +76,10 @@ enum AppComposition {
         resolve: @escaping (NavigationRequest) -> UIViewController
     ) -> UIViewController {
         let controller = NavigationStackController(path: UIBindable(stack).path) { resolve(root) }
-        controller.navigationDestination(for: NavigationEntry.self) { resolve($0.request) }
+        controller.navigationDestination(for: NavigationEntry.self) { [weak stack] entry in
+            stack?.localScreen(for: entry.id) ?? resolve(entry.request)
+        }
+        stack.controller = controller
         return controller
     }
 

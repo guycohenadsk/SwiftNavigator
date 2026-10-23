@@ -26,6 +26,7 @@ let package = Package(
             dependencies: [
                 "NavigationCore",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "UIKitNavigation", package: "swift-navigation"),
             ]
         ),
 
@@ -72,6 +73,14 @@ let package = Package(
         .target(name: "ScreenDKit", dependencies: ["NavigationCore", "ScreenDNavigationContract"]),
 
         .testTarget(name: "NavigationCoreTests", dependencies: ["NavigationCore"]),
+        .testTarget(
+            name: "NavigatorDependencyTests",
+            dependencies: [
+                "NavigatorDependency",
+                "NavigationCore",
+                .product(name: "UIKitNavigation", package: "swift-navigation"),
+            ]
+        ),
         .testTarget(
             name: "RefPickerTests",
             dependencies: [

@@ -79,7 +79,7 @@ public struct IssuesList {
             case let .issueTapped(id):
                 if state.isPicker {
                     guard let issue = state.issues[id: id] else { return .none }
-                    let picked = EntityRef(target: .issues, id: issue.id.uuidString, title: issue.rowTitle)
+                    let picked = Issues.ref(for: issue)
                     let navigator = navigator
                     return .run { _ in await navigator.complete(with: .selectedEntity(picked)) }
                 }

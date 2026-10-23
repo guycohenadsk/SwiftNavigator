@@ -4,6 +4,7 @@ import NavigationCore
 import NavigatorDependency
 import ScreenCNavigationContract
 import Testing
+import UIKit
 
 @testable import IssuesDomain
 
@@ -25,6 +26,9 @@ private final class CompletionSpy: Navigator {
 
     /// Feeds deep-link actions to whichever list subscribed.
     private(set) var actionContinuation: AsyncStream<String>.Continuation?
+    func push(local request: NavigationRequest, from origin: UIViewController, screen: @escaping @MainActor () -> UIViewController, onDismiss: @escaping @MainActor () -> Void) -> NavigationEntry.ID { NavigationEntry.ID() }
+    func remove(_ id: NavigationEntry.ID) {}
+
     func performedActions(for target: NavigationTarget) -> AsyncStream<String> {
         let (stream, continuation) = AsyncStream<String>.makeStream()
         actionContinuation = continuation
