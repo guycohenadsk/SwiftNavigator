@@ -29,6 +29,15 @@ public protocol Navigator: Sendable {
         screen: @escaping @MainActor () -> UIViewController,
         onDismiss: @escaping @MainActor () -> Void
     ) -> NavigationEntry.ID
+    /// Presents a screen whose state its parent owns in a new modal stack, as an entry named
+    /// `request`. `onDismiss` fires once, however the modal leaves — swipe-down, `dismiss()`, a deep
+    /// link — but not when the parent removes it with `remove(_:)`. Returns the entry's id.
+    @discardableResult
+    func present(
+        local request: NavigationRequest,
+        screen: @escaping @MainActor () -> UIViewController,
+        onDismiss: @escaping @MainActor () -> Void
+    ) -> NavigationEntry.ID
     /// Removes the entry `id` and everything pushed above it, wherever it is. Used by a parent
     /// whose child state went away. Does nothing if the entry is already gone.
     func remove(_ id: NavigationEntry.ID)

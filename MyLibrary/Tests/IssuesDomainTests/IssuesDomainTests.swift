@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import NavigatorDependency
 import Testing
 
 @testable import IssuesDomain
@@ -13,11 +14,12 @@ struct IssuesDomainTests {
 
     /// In-memory file storage, reset to the seed, so nothing touches the real
     /// `Documents/issues.json` and every test starts from the same eight issues.
-    private func makeListStore() -> TestStoreOf<IssuesList> {
+    private func makeListStore(childNavigator: ChildNavigator = .recording()) -> TestStoreOf<IssuesList> {
         withDependencies {
             $0.defaultFileStorage = .inMemory
             $0.uuid = .incrementing
             $0.date = .constant(Self.now)
+            $0.childNavigator = childNavigator
         } operation: {
             @Shared(.issues) var issues
             $issues.withLock { $0 = Issue.seed }
@@ -25,14 +27,30 @@ struct IssuesDomainTests {
         }
     }
 
-    @Test("Tapping a row opens the detail screen for that issue")
+    @Test("Tapping a row opens the detail screen for that issue, and pushes it")
     func tappingRowOpensDetail() async {
-        let store = makeListStore()
+        let childNavigator = ChildNavigator.recording()
+        let store = makeListStore(childNavigator: childNavigator)
         let issue = store.state.issues[1]
 
         await store.send(.issueTapped(issue.id)) {
             $0.detail = IssuesDetail.State(issue: Shared(value: issue))
         }
+        await store.finish()
+        #expect(childNavigator.history == [ChildPush(Issues.detailRequest(for: issue))])
+    }
+
+    @Test("Adding an issue opens and pushes the new issue's detail")
+    func addingPushesDetail() async {
+        let childNavigator = ChildNavigator.recording()
+        let store = makeListStore(childNavigator: childNavigator)
+        store.exhaustivity = .off
+
+        await store.send(.addIssueTapped)
+        await store.finish()
+
+        let detail = try? #require(store.state.detail)
+        #expect(childNavigator.history == detail.map { [ChildPush(Issues.detailRequest(for: $0.issue))] })
     }
 
     /// The one failure mode that is invisible by hand: if the detail screen held a copy instead of

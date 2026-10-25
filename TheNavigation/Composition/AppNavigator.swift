@@ -32,8 +32,9 @@ final class StackNavigator {
 
     func push(local entry: NavigationEntry, screen: @escaping @MainActor () -> UIViewController, onDismiss: @escaping @MainActor () -> Void) {
         localScreens[entry.id] = screen
+        // Any final result means the entry is gone — `.dismissed`, or the child completing itself.
         push(entry) { result in
-            if case .dismissed = result { onDismiss() }
+            if result.isFinal { onDismiss() }
         }
     }
 
@@ -74,11 +75,15 @@ final class ModalNavigator: Identifiable {
     let root: NavigationEntry
     let stack = StackNavigator()
     @ObservationIgnored var onResult: NavigationResultHandler?
+    /// The root's builder when a parent presented it (`present(local:…)`); otherwise the registry
+    /// resolves `root.request`.
+    @ObservationIgnored let localScreen: (@MainActor () -> UIViewController)?
     var id: UUID { root.id }
 
-    init(root: NavigationEntry, onResult: NavigationResultHandler?) {
+    init(root: NavigationEntry, onResult: NavigationResultHandler?, localScreen: (@MainActor () -> UIViewController)? = nil) {
         self.root = root
         self.onResult = onResult
+        self.localScreen = localScreen
     }
 }
 
@@ -173,7 +178,26 @@ final class AppNavigator: Navigator {
         return entry.id
     }
 
+    func present(
+        local request: NavigationRequest,
+        screen: @escaping @MainActor () -> UIViewController,
+        onDismiss: @escaping @MainActor () -> Void
+    ) -> NavigationEntry.ID {
+        let entry = NavigationEntry(request: request)
+        let modal = ModalNavigator(root: entry, onResult: { result in
+            if result.isFinal { onDismiss() }
+        }, localScreen: screen)
+        modals.append(modal)
+        return entry.id
+    }
+
     func remove(_ id: NavigationEntry.ID) {
+        if let index = modals.firstIndex(where: { $0.root.id == id }) {
+            // Its parent asked for this: no onDismiss for it, while modals above still report.
+            modals[index].onResult = nil
+            modals.removeSubrange(index...)
+            return
+        }
         for stack in allStacks where stack.remove(id) { return }
     }
 

@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import NavigationCore
 import NavigatorDependency
+import ScreenBNavigationContract
 
 @Reducer
 public struct ScreenBFeature {
@@ -25,6 +26,7 @@ public struct ScreenBFeature {
     }
 
     @Dependency(\.navigator) var navigator
+    @Dependency(\.childNavigator) var childNavigator
 
     public init() {}
 
@@ -59,7 +61,8 @@ public struct ScreenBFeature {
 
             case .pushScreenB2Tapped:
                 state.screenB2 = ScreenB2Feature.State()
-                return .none
+                let childNavigator = childNavigator
+                return .run { _ in await childNavigator.push(ScreenBNavigationContract.request(for: .b2)) }
 
             case .screenB2:
                 return .none

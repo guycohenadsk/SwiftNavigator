@@ -34,6 +34,9 @@ private final class DetailNavigatorSpy: Navigator {
 
     func remove(_ id: NavigationEntry.ID) { removed.append(id) }
 
+    func present(local request: NavigationRequest, screen: @escaping @MainActor () -> UIViewController, onDismiss: @escaping @MainActor () -> Void) -> NavigationEntry.ID { NavigationEntry.ID() }
+
+
     func push(_ request: NavigationRequest, onResult: NavigationResultHandler?) {}
     func present(_ request: NavigationRequest, onResult: NavigationResultHandler?) {}
     func send(_ result: NavigationResult) {}
@@ -65,20 +68,21 @@ struct IssuesDetailNavigationTests {
         } operation: {
             @Shared(.issues) var issues
             $issues.withLock { $0 = Issue.seed }
-            let store = Store(initialState: IssuesList.State()) { IssuesList() }
-            return (store, IssuesListHostingController(store: store))
+            let controller = IssuesListHostingController(initialState: IssuesList.State())
+            return (controller.store, controller)
         }
         controller.loadViewIfNeeded()
     }
 
     private var firstIssue: IssuesDomain.Issue { store.issues[0] }
 
-    @Test("Tapping a row sets the list's detail state and pushes it as an .open entry")
+    @Test("Tapping a row sets the list's detail state, and the reducer pushes it as an .open entry")
     func tapPushes() async throws {
         store.send(.issueTapped(firstIssue.id))
         await settle()
 
         #expect(store.detail?.issue.id == firstIssue.id)
+        #expect(controller.childNavigator.history == [ChildPush(Issues.detailRequest(for: firstIssue))])
         let push = try #require(spy.pushes.first)
         #expect(spy.pushes.count == 1)
         #expect(push.request == NavigationRequest(intent: .open(Issues.ref(for: firstIssue))))

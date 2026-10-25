@@ -54,6 +54,15 @@ private struct UnimplementedNavigator: Navigator {
         return NavigationEntry.ID()
     }
 
+    func present(
+        local request: NavigationRequest,
+        screen: @escaping @MainActor () -> UIViewController,
+        onDismiss: @escaping @MainActor () -> Void
+    ) -> NavigationEntry.ID {
+        assertionFailure("Presented \(request) before AppComposition installed a live Navigator.")
+        return NavigationEntry.ID()
+    }
+
     func remove(_ id: NavigationEntry.ID) {
         assertionFailure("Removed an entry before AppComposition installed a live Navigator.")
     }

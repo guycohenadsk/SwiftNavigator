@@ -8,7 +8,7 @@ extension ScreenB {
         resolver: { request, _ in
             switch try route(for: request) {
             case .home:
-                ScreenBHostingController(store: Store(initialState: ScreenBFeature.State()) { ScreenBFeature() })
+                ScreenBHostingController(initialState: ScreenBFeature.State())
             }
         }
     )

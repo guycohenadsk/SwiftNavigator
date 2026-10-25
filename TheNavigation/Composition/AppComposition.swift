@@ -77,9 +77,10 @@ enum AppComposition {
     private static func makeStack(
         _ stack: StackNavigator,
         root: NavigationRequest,
+        rootScreen: (@MainActor () -> UIViewController)? = nil,
         resolve: @escaping (NavigationRequest) -> UIViewController
     ) -> UIViewController {
-        let controller = NavigationStackController(path: UIBindable(stack).path) { resolve(root) }
+        let controller = NavigationStackController(path: UIBindable(stack).path) { rootScreen?() ?? resolve(root) }
         controller.navigationDestination(for: NavigationEntry.self) { [weak stack] entry in
             stack?.localScreen(for: entry.id) ?? resolve(entry.request)
         }
@@ -96,7 +97,7 @@ enum AppComposition {
         resolve: @escaping (NavigationRequest) -> UIViewController
     ) {
         presenter.present(item: UIBindable(navigator)[dynamicMember: \AppNavigator.[modalAt: level]]) { modal in
-            let stack = makeStack(modal.stack, root: modal.root.request, resolve: resolve)
+            let stack = makeStack(modal.stack, root: modal.root.request, rootScreen: modal.localScreen, resolve: resolve)
             attachModal(at: level + 1, on: stack, navigator: navigator, resolve: resolve)
             return stack
         }

@@ -21,6 +21,11 @@ extension Issues {
         EntityRef(target: .issues, id: issue.id.uuidString, title: issue.rowTitle)
     }
 
+    /// The stack entry of `issue`'s detail, pushed by the list that owns its state.
+    static func detailRequest(for issue: Issue) -> NavigationRequest {
+        NavigationRequest(intent: .open(ref(for: issue)))
+    }
+
     static func route(for request: NavigationRequest) throws -> IssuesNavigationContract.Route {
         guard request.target == IssuesNavigationContract.target else { throw NavigationError.wrongTarget }
         switch request.intent {
@@ -35,9 +40,9 @@ extension Issues {
     static func viewController(for route: IssuesNavigationContract.Route) -> UIViewController {
         switch route {
         case .list:
-            return IssuesListHostingController(store: Store(initialState: IssuesList.State()) { IssuesList() })
+            return IssuesListHostingController(initialState: IssuesList.State())
         case .picker:
-            return IssuesListHostingController(store: Store(initialState: IssuesList.State(isPicker: true)) { IssuesList() })
+            return IssuesListHostingController(initialState: IssuesList.State(isPicker: true))
         case let .details(id):
             @Shared(.issues) var issues
             guard let uuid = UUID(uuidString: id), let issue = Shared($issues[id: uuid]) else {

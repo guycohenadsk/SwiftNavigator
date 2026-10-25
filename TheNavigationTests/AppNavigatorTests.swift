@@ -382,6 +382,63 @@ struct AppNavigatorLocalEntryTests {
         #expect(navigator.tabs[0].localScreen(for: id) == nil)
     }
 
+    @Test("A local entry the child completes itself (a final result) still calls onDismiss")
+    func completeDismisses() throws {
+        let (navigator, controllers) = makeBoundNavigator()
+        var dismissals = 0
+        navigator.push(local: detail, from: try #require(controllers[0].viewControllers.first), screen: { UIViewController() }, onDismiss: { dismissals += 1 })
+
+        navigator.complete(with: .selectedEntity(EntityRef(target: .issues, id: "1", title: "")))
+
+        #expect(dismissals == 1)
+        #expect(navigator.tabs[0].path.isEmpty)
+    }
+
+    @Test("present(local:) opens a modal whose root is the parent's screen; leaving it calls onDismiss")
+    func presentLocal() {
+        let navigator = makeNavigator()
+        var dismissals = 0
+        let screen = UIViewController()
+
+        let id = navigator.present(local: detail, screen: { screen }, onDismiss: { dismissals += 1 })
+
+        #expect(navigator.modals.map(\.root.id) == [id])
+        #expect(navigator.modals.first?.root.request == detail)
+        #expect(navigator.modals.first?.localScreen?() === screen)
+
+        navigator.dismiss()
+        #expect(dismissals == 1)
+        #expect(navigator.modals.isEmpty)
+    }
+
+    @Test("A locally presented modal also reports a swipe-down and a deep-link reset")
+    func presentLocalReset() {
+        let navigator = makeNavigator()
+        var dismissals = 0
+        navigator.present(local: detail, screen: { UIViewController() }, onDismiss: { dismissals += 1 })
+        navigator[modalAt: 0] = nil   // swipe-down
+        #expect(dismissals == 1)
+
+        navigator.present(local: detail, screen: { UIViewController() }, onDismiss: { dismissals += 1 })
+        navigator.open(deepLink: NavigationRequest(intent: .browse(.screenB)))
+        #expect(dismissals == 2)
+    }
+
+    @Test("remove() of a locally presented modal takes it and every modal above, reporting only those above")
+    func removePresentedLocal() {
+        let navigator = makeNavigator()
+        var dismissals = 0
+        let log = ResultLog()
+        let id = navigator.present(local: detail, screen: { UIViewController() }, onDismiss: { dismissals += 1 })
+        navigator.present(screenC, onResult: log.handler)
+
+        navigator.remove(id)
+
+        #expect(navigator.modals.isEmpty)
+        #expect(dismissals == 0)
+        #expect(log.results == [.dismissed])
+    }
+
     @Test("remove() finds the entry on a background tab, and ignores ids that are gone")
     func removeAnywhere() throws {
         let (navigator, controllers) = makeBoundNavigator()

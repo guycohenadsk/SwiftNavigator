@@ -42,6 +42,7 @@ public struct IssuesList {
     }
 
     @Dependency(\.navigator) var navigator
+    @Dependency(\.childNavigator) var childNavigator
     @Dependency(\.uuid) var uuid
     @Dependency(\.date.now) var now
 
@@ -132,11 +133,14 @@ public struct IssuesList {
         }
     }
 
-    /// Derives a `Shared<Issue>` pointing *into* the persisted array, so the detail screen edits
-    /// the stored issue rather than a detached copy.
+    /// Opens the detail: its state goes in `detail` (the list owns it, so the detail talks back
+    /// through `.ifLet`), and the navigator pushes it. Derives a `Shared<Issue>` pointing *into* the
+    /// persisted array, so the detail screen edits the stored issue rather than a detached copy.
     private func open(_ id: Issue.ID, in state: inout State) -> Effect<Action> {
         guard let issue = Shared(state.$issues[id: id]) else { return .none }
         state.detail = IssuesDetail.State(issue: issue)
-        return .none
+        let childNavigator = childNavigator
+        let request = Issues.detailRequest(for: issue.wrappedValue)
+        return .run { _ in await childNavigator.push(request) }
     }
 }

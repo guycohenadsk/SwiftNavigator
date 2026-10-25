@@ -34,6 +34,9 @@ private final class LocalPushSpy: Navigator {
 
     func remove(_ id: NavigationEntry.ID) { removed.append(id) }
 
+    func present(local request: NavigationRequest, screen: @escaping @MainActor () -> UIViewController, onDismiss: @escaping @MainActor () -> Void) -> NavigationEntry.ID { NavigationEntry.ID() }
+
+
     func push(_ request: NavigationRequest, onResult: NavigationResultHandler?) {}
     func present(_ request: NavigationRequest, onResult: NavigationResultHandler?) {}
     func send(_ result: NavigationResult) {}
@@ -62,8 +65,8 @@ struct ScreenB2NavigationTests {
         (store, controller) = withDependencies {
             $0.navigator = spy
         } operation: {
-            let store = Store(initialState: ScreenBFeature.State()) { ScreenBFeature() }
-            return (store, ScreenBHostingController(store: store))
+            let controller = ScreenBHostingController(initialState: ScreenBFeature.State())
+            return (controller.store, controller)
         }
         controller.loadViewIfNeeded()
     }
@@ -74,6 +77,7 @@ struct ScreenB2NavigationTests {
         await settle()
 
         #expect(store.screenB2 != nil)
+        #expect(controller.childNavigator.history == [ChildPush(ScreenBNavigationContract.request(for: .b2))])
         let push = try #require(spy.pushes.first)
         #expect(spy.pushes.count == 1)
         #expect(push.request == NavigationRequest(intent: .screen(.screenB, name: "b2")))
