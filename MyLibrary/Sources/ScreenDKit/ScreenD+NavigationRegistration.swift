@@ -4,9 +4,9 @@ import ScreenDNavigationContract
 extension ScreenD {
     public static let navigationRegistration = NavigationRegistration(
         target: ScreenDNavigationContract.target,
-        resolver: { request, navigator in
+        resolver: { request, context in
             switch try route(for: request) {
-            case .home: ScreenDViewController(navigator: navigator)
+            case .home: ScreenDViewController(navigator: context.navigator)
             }
         }
     )

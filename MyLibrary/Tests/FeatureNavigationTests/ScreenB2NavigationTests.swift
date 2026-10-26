@@ -8,36 +8,12 @@ import UIKit
 
 @testable import ScreenBFeature
 
-/// Records the local pushes Screen B makes through the navigator, and the entries it removes.
+/// Records the requests Screen B pushes.
 @MainActor
-private final class LocalPushSpy: Navigator {
-    struct LocalPush {
-        let id: NavigationEntry.ID
-        let request: NavigationRequest
-        let screen: @MainActor () -> UIViewController
-        let onDismiss: @MainActor () -> Void
-    }
+private final class PushSpy: Navigator {
+    private(set) var pushed: [NavigationRequest] = []
 
-    private(set) var pushes: [LocalPush] = []
-    private(set) var removed: [NavigationEntry.ID] = []
-
-    func push(
-        local request: NavigationRequest,
-        from origin: UIViewController,
-        screen: @escaping @MainActor () -> UIViewController,
-        onDismiss: @escaping @MainActor () -> Void
-    ) -> NavigationEntry.ID {
-        let push = LocalPush(id: NavigationEntry.ID(), request: request, screen: screen, onDismiss: onDismiss)
-        pushes.append(push)
-        return push.id
-    }
-
-    func remove(_ id: NavigationEntry.ID) { removed.append(id) }
-
-    func present(local request: NavigationRequest, screen: @escaping @MainActor () -> UIViewController, onDismiss: @escaping @MainActor () -> Void) -> NavigationEntry.ID { NavigationEntry.ID() }
-
-
-    func push(_ request: NavigationRequest, onResult: NavigationResultHandler?) {}
+    func push(_ request: NavigationRequest, onResult: NavigationResultHandler?) { pushed.append(request) }
     func present(_ request: NavigationRequest, onResult: NavigationResultHandler?) {}
     func send(_ result: NavigationResult) {}
     func complete(with result: NavigationResult) {}
@@ -47,55 +23,27 @@ private final class LocalPushSpy: Navigator {
     func incomingRequests(for target: NavigationTarget) -> AsyncStream<NavigationRequest> { AsyncStream { _ in } }
 }
 
-@MainActor
-private func settle() async {
-    for _ in 0..<20 { await Task.yield() }
-}
-
-/// Screen B2 travels through the navigator as Screen B's `.b2` entry; its state stays in Screen B.
+/// Screen B2 is pushed as Screen B's `.b2` request and built by Screen B's registration; Screen B
+/// keeps no state of it.
 @MainActor
 @Suite("Screen B → B2 through the navigator")
 struct ScreenB2NavigationTests {
-    private let spy = LocalPushSpy()
-    private let store: StoreOf<ScreenBFeature>
-    private let controller: ScreenBHostingController
-
-    init() {
-        let spy = spy
-        (store, controller) = withDependencies {
+    @Test("Pushing B2 pushes a .screen(.screenB, \"b2\") request, and only that")
+    func pushes() async {
+        let spy = PushSpy()
+        let store = TestStore(initialState: ScreenBFeature.State()) { ScreenBFeature() } withDependencies: {
             $0.navigator = spy
-        } operation: {
-            let controller = ScreenBHostingController(initialState: ScreenBFeature.State())
-            return (controller.store, controller)
         }
-        controller.loadViewIfNeeded()
+
+        await store.send(.pushScreenB2Tapped)
+        await store.finish()
+
+        #expect(spy.pushed == [NavigationRequest(intent: .screen(.screenB, name: "b2"))])
     }
 
-    @Test("Pushing B2 sets Screen B's state and pushes a .screen(.screenB, \"b2\") entry")
-    func pushes() async throws {
-        store.send(.pushScreenB2Tapped)
-        await settle()
-
-        #expect(store.screenB2 != nil)
-        #expect(controller.childNavigator.history == [ChildPush(ScreenBNavigationContract.request(for: .b2))])
-        let push = try #require(spy.pushes.first)
-        #expect(spy.pushes.count == 1)
-        #expect(push.request == NavigationRequest(intent: .screen(.screenB, name: "b2")))
-        #expect(push.screen() is UIHostingController<ScreenB2View>)
-    }
-
-    @Test("Leaving B2 clears Screen B's state, and B2 can be pushed again")
-    func dismissThenReopen() async throws {
-        store.send(.pushScreenB2Tapped)
-        await settle()
-
-        try #require(spy.pushes.first).onDismiss()
-        await settle()
-        #expect(store.screenB2 == nil)
-
-        store.send(.pushScreenB2Tapped)
-        await settle()
-        #expect(spy.pushes.count == 2)
-        #expect(spy.removed.isEmpty)
+    @Test("Screen B's registration builds B2 from that request")
+    func resolvesB2() throws {
+        let controller = try ScreenB.navigationRegistration.resolver(ScreenBNavigationContract.request(for: .b2), NavigationContext(navigator: PushSpy()))
+        #expect(controller is UIHostingController<ScreenB2View>)
     }
 }

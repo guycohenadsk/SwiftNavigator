@@ -4,10 +4,10 @@ import ScreenCNavigationContract
 extension ScreenC {
     public static let navigationRegistration = NavigationRegistration(
         target: ScreenCNavigationContract.target,
-        resolver: { request, navigator in
+        resolver: { request, context in
             switch try route(for: request) {
-            case .home: ScreenCViewController(navigator: navigator)
-            case let .compose(prompt): ScreenCViewController(navigator: navigator, prompt: prompt)
+            case .home: ScreenCViewController(navigator: context.navigator)
+            case let .compose(prompt): ScreenCViewController(navigator: context.navigator, prompt: prompt)
             }
         }
     )

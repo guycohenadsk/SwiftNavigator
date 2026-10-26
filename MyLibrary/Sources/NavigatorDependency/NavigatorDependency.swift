@@ -44,29 +44,6 @@ private struct UnimplementedNavigator: Navigator {
         assertionFailure("Dismissed before AppComposition installed a live Navigator.")
     }
 
-    func push(
-        local request: NavigationRequest,
-        from origin: UIViewController,
-        screen: @escaping @MainActor () -> UIViewController,
-        onDismiss: @escaping @MainActor () -> Void
-    ) -> NavigationEntry.ID {
-        assertionFailure("Pushed \(request) before AppComposition installed a live Navigator.")
-        return NavigationEntry.ID()
-    }
-
-    func present(
-        local request: NavigationRequest,
-        screen: @escaping @MainActor () -> UIViewController,
-        onDismiss: @escaping @MainActor () -> Void
-    ) -> NavigationEntry.ID {
-        assertionFailure("Presented \(request) before AppComposition installed a live Navigator.")
-        return NavigationEntry.ID()
-    }
-
-    func remove(_ id: NavigationEntry.ID) {
-        assertionFailure("Removed an entry before AppComposition installed a live Navigator.")
-    }
-
     func incomingRequests(for target: NavigationTarget) -> AsyncStream<NavigationRequest> {
         assertionFailure("Subscribed to \(target)'s deep links before AppComposition installed a live Navigator.")
         return AsyncStream { $0.finish() }

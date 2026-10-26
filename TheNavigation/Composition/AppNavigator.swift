@@ -13,44 +13,25 @@ final class StackNavigator {
         didSet {
             let removedIDs = Set(oldValue.map(\.id)).subtracting(path.map(\.id))
             for id in removedIDs {
-                localScreens[id] = nil
+                leaveActions.removeValue(forKey: id)?()
                 handlers.removeValue(forKey: id)?(.dismissed)
             }
         }
     }
     @ObservationIgnored private var handlers: [UUID: NavigationResultHandler] = [:]
-    /// Builders of entries a parent pushed with `push(local:…)`; everything else goes through the
-    /// registry.
-    @ObservationIgnored private var localScreens: [UUID: @MainActor () -> UIViewController] = [:]
-    /// The UIKit stack bound to `path`, so a parent screen's pushes can find their stack.
+    /// What to run when an entry leaves (`NavigationContext.onLeave`).
+    @ObservationIgnored private var leaveActions: [UUID: @MainActor () -> Void] = [:]
+    /// The UIKit stack bound to `path`, so removals can wait for what covers it.
     @ObservationIgnored weak var controller: UINavigationController?
+
+    /// Runs `action` once the entry `id` leaves, however it leaves.
+    func onLeave(_ id: UUID, _ action: @escaping @MainActor () -> Void) {
+        leaveActions[id] = action
+    }
 
     func push(_ entry: NavigationEntry, onResult: NavigationResultHandler?) {
         handlers[entry.id] = onResult
         path.append(entry)
-    }
-
-    func push(local entry: NavigationEntry, screen: @escaping @MainActor () -> UIViewController, onDismiss: @escaping @MainActor () -> Void) {
-        localScreens[entry.id] = screen
-        // Any final result means the entry is gone — `.dismissed`, or the child completing itself.
-        push(entry) { result in
-            if result.isFinal { onDismiss() }
-        }
-    }
-
-    /// The screen of a local entry, or `nil` for entries the registry resolves.
-    func localScreen(for id: UUID) -> UIViewController? {
-        localScreens[id]?()
-    }
-
-    /// Removes `id` and everything above it. `id`'s own handler is dropped first — its parent asked
-    /// for this — while entries above still report `.dismissed`. Returns whether `id` was here.
-    @discardableResult
-    func remove(_ id: UUID) -> Bool {
-        guard let index = path.firstIndex(where: { $0.id == id }) else { return false }
-        handlers[id] = nil
-        path.removeSubrange(index...)
-        return true
     }
 
     /// Hands an update to whoever pushed the top entry, leaving it in place.
@@ -59,12 +40,29 @@ final class StackNavigator {
         handlers[last.id]?(result)
     }
 
-    /// Removes the top entry and hands `result` to whoever pushed it.
+    /// Removes the top entry and hands `result` to whoever pushed it — right away, while the entry
+    /// itself leaves once nothing covers the stack (see `removeWhenUncovered(_:)`).
     func complete(with result: NavigationResult) {
         guard let last = path.last else { return }
         let handler = handlers.removeValue(forKey: last.id)
-        path.removeLast()
+        removeWhenUncovered(last.id)
         handler?(result)
+    }
+
+    /// Removes the top entry; its handler gets `.dismissed`.
+    func pop() {
+        guard let last = path.last else { return }
+        removeWhenUncovered(last.id)
+    }
+
+    /// Removes `id` and everything above it once nothing is presented over this stack:
+    /// `UINavigationController` ignores a pop while something covers it — e.g. the delete alert a
+    /// screen closes itself from, still animating away.
+    private func removeWhenUncovered(_ id: UUID) {
+        whenUncovered(controller) { [weak self] in
+            guard let self, let index = path.firstIndex(where: { $0.id == id }) else { return }
+            path.removeSubrange(index...)
+        }
     }
 }
 
@@ -75,15 +73,11 @@ final class ModalNavigator: Identifiable {
     let root: NavigationEntry
     let stack = StackNavigator()
     @ObservationIgnored var onResult: NavigationResultHandler?
-    /// The root's builder when a parent presented it (`present(local:…)`); otherwise the registry
-    /// resolves `root.request`.
-    @ObservationIgnored let localScreen: (@MainActor () -> UIViewController)?
     var id: UUID { root.id }
 
-    init(root: NavigationEntry, onResult: NavigationResultHandler?, localScreen: (@MainActor () -> UIViewController)? = nil) {
+    init(root: NavigationEntry, onResult: NavigationResultHandler?) {
         self.root = root
         self.onResult = onResult
-        self.localScreen = localScreen
     }
 }
 
@@ -124,14 +118,6 @@ final class AppNavigator: Navigator {
     }
 
     private var current: StackNavigator { modals.last?.stack ?? tabs[tabIndex] }
-    private var allStacks: [StackNavigator] { tabs + modals.map(\.stack) }
-
-    /// The stack whose UIKit controller shows `origin`, so a parent's child lands next to it even if
-    /// another stack is on top. Falls back to the current stack for a screen not yet on one.
-    private func stack(holding origin: UIViewController) -> StackNavigator {
-        let controller = origin.navigationController ?? origin as? UINavigationController
-        return allStacks.first { $0.controller != nil && $0.controller === controller } ?? current
-    }
 
     func push(_ request: NavigationRequest, onResult: NavigationResultHandler?) {
         current.push(NavigationEntry(request: request), onResult: onResult)
@@ -167,41 +153,7 @@ final class AppNavigator: Navigator {
         }
     }
 
-    func push(
-        local request: NavigationRequest,
-        from origin: UIViewController,
-        screen: @escaping @MainActor () -> UIViewController,
-        onDismiss: @escaping @MainActor () -> Void
-    ) -> NavigationEntry.ID {
-        let entry = NavigationEntry(request: request)
-        stack(holding: origin).push(local: entry, screen: screen, onDismiss: onDismiss)
-        return entry.id
-    }
-
-    func present(
-        local request: NavigationRequest,
-        screen: @escaping @MainActor () -> UIViewController,
-        onDismiss: @escaping @MainActor () -> Void
-    ) -> NavigationEntry.ID {
-        let entry = NavigationEntry(request: request)
-        let modal = ModalNavigator(root: entry, onResult: { result in
-            if result.isFinal { onDismiss() }
-        }, localScreen: screen)
-        modals.append(modal)
-        return entry.id
-    }
-
-    func remove(_ id: NavigationEntry.ID) {
-        if let index = modals.firstIndex(where: { $0.root.id == id }) {
-            // Its parent asked for this: no onDismiss for it, while modals above still report.
-            modals[index].onResult = nil
-            modals.removeSubrange(index...)
-            return
-        }
-        for stack in allStacks where stack.remove(id) { return }
-    }
-
-    func pop() { _ = current.path.popLast() }
+    func pop() { current.pop() }
     func popToRoot() { current.path.removeAll() }
     func dismiss() { _ = modals.popLast() }
 
@@ -283,4 +235,43 @@ private struct RootSubscriber {
 private struct PendingRequest {
     let request: NavigationRequest
     let stack: StackNavigator
+}
+
+/// Runs `work` once nothing is presented over `controller`'s stack. SwiftUI presents a screen's
+/// alerts from a container (often the window's root), so the whole window is checked, skipping
+/// presentations that hold the stack itself (the modal it lives in). An alert that is up and not
+/// leaving — its state already gone — is closed. Checked every 50 ms; after about two seconds `work`
+/// runs regardless. Without a window (unit tests) `work` runs right away.
+@MainActor
+private func whenUncovered(_ controller: UIViewController?, attempt: Int = 0, _ work: @escaping @MainActor () -> Void) {
+    guard let controller, attempt < 40, let covering = presentation(covering: controller) else { return work() }
+    if !(covering is UINavigationController), covering.transitionCoordinator == nil, !covering.isBeingDismissed {
+        covering.presentingViewController?.dismiss(animated: true)
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(50)) {
+        whenUncovered(controller, attempt: attempt + 1, work)
+    }
+}
+
+/// The first presentation in `controller`'s window that doesn't contain `controller`.
+@MainActor
+private func presentation(covering controller: UIViewController) -> UIViewController? {
+    var presented = controller.view.window?.rootViewController?.presentedViewController
+    while let candidate = presented {
+        if !controller.isInside(candidate) { return candidate }
+        presented = candidate.presentedViewController
+    }
+    return nil
+}
+
+extension UIViewController {
+    /// Whether `container` is this controller or one of its ancestors.
+    fileprivate func isInside(_ container: UIViewController) -> Bool {
+        var current: UIViewController? = self
+        while let controller = current {
+            if controller === container { return true }
+            current = controller.parent
+        }
+        return false
+    }
 }

@@ -8,11 +8,9 @@ import ScreenCNavigationContract
 public struct IssuesList {
     @ObservableState
     public struct State: Equatable {
-        /// Persisted to `Documents/issues.json`. The detail screen edits elements of this same
-        /// array through a derived `Shared<Issue>`, so its edits land here — and on disk —
-        /// without any save action travelling back.
+        /// Persisted to `Documents/issues.json`. The list's detail works on a copy and reports its
+        /// edits and deletion as `.detail` actions; the list applies them here.
         @Shared(.issues) public var issues: IdentifiedArrayOf<Issue>
-        @Presents public var detail: IssuesDetail.State?
         /// Picker mode: tapping a row reports the issue to whoever opened the picker.
         public var isPicker: Bool
         /// The last text Screen C sent back from compose mode.
@@ -34,7 +32,8 @@ public struct IssuesList {
         case issueTapped(Issue.ID)
         case addIssueTapped
         case deleteIssues(IndexSet)
-        case detail(PresentationAction<IssuesDetail.Action>)
+        /// An update from the detail the list pushed.
+        case detail(IssuesDetail.Output)
         case screenC(ScreenCNavigationContract.Output)
         /// A deep link delivered to the list at the root of the Issues tab: an issue to open
         /// (`demoapp://issues/<id>`), or an action (`?action=<name>`).
@@ -42,7 +41,6 @@ public struct IssuesList {
     }
 
     @Dependency(\.navigator) var navigator
-    @Dependency(\.childNavigator) var childNavigator
     @Dependency(\.uuid) var uuid
     @Dependency(\.date.now) var now
 
@@ -66,7 +64,7 @@ public struct IssuesList {
                 case let .open(ref):
                     // An unknown or deleted issue leaves the list as it is.
                     guard let id = UUID(uuidString: ref.id) else { return .none }
-                    return open(id, in: &state)
+                    return open(id, in: state)
                 case .perform(_, Issues.screenCContextAction):
                     return pushScreenCWithContext()
                 default:
@@ -91,33 +89,32 @@ public struct IssuesList {
                     let navigator = navigator
                     return .run { _ in await navigator.complete(with: .selectedEntity(picked)) }
                 }
-                return open(id, in: &state)
+                return open(id, in: state)
 
             case .addIssueTapped:
                 let issue = Issue(id: uuid(), status: .draft, createdAt: now)
                 state.$issues.withLock { $0.append(issue) }
-                return open(issue.id, in: &state)
+                return open(issue.id, in: state)
 
             case let .deleteIssues(offsets):
                 state.$issues.withLock { $0.remove(atOffsets: offsets) }
                 return .none
 
-            case .detail(.presented(.delegate(.deleteRequested))):
-                guard let id = state.detail?.issue.id else { return .none }
-                state.detail = nil
-                _ = state.$issues.withLock { $0.remove(id: id) }
+            case let .detail(.edited(issue)):
+                // Only issues still stored: an edit must not bring back a deleted one.
+                state.$issues.withLock { issues in
+                    if issues[id: issue.id] != nil { issues[id: issue.id] = issue }
+                }
                 return .none
 
-            case .detail:
+            case let .detail(.deleteRequested(id)):
+                _ = state.$issues.withLock { $0.remove(id: id) }
                 return .none
 
             case let .screenC(.textSubmitted(text)):
                 state.screenCText = text
                 return .none
             }
-        }
-        .ifLet(\.$detail, action: \.detail) {
-            IssuesDetail()
         }
     }
 
@@ -133,14 +130,16 @@ public struct IssuesList {
         }
     }
 
-    /// Opens the detail: its state goes in `detail` (the list owns it, so the detail talks back
-    /// through `.ifLet`), and the navigator pushes it. Derives a `Shared<Issue>` pointing *into* the
-    /// persisted array, so the detail screen edits the stored issue rather than a detached copy.
-    private func open(_ id: Issue.ID, in state: inout State) -> Effect<Action> {
-        guard let issue = Shared(state.$issues[id: id]) else { return .none }
-        state.detail = IssuesDetail.State(issue: issue)
-        let childNavigator = childNavigator
-        let request = Issues.detailRequest(for: issue.wrappedValue)
-        return .run { _ in await childNavigator.push(request) }
+    /// Pushes the detail through the navigator, which builds it from the request. The list keeps no
+    /// state of it: every edit and the delete come back as `.detail` actions until it leaves.
+    private func open(_ id: Issue.ID, in state: State) -> Effect<Action> {
+        guard let issue = state.issues[id: id] else { return .none }
+        let navigator = navigator
+        return .run { send in
+            let request = Issues.detailRequest(for: issue)
+            for await output in await navigator.pushForOutputs(request, as: IssuesDetail.Output.self) {
+                await send(.detail(output))
+            }
+        }
     }
 }

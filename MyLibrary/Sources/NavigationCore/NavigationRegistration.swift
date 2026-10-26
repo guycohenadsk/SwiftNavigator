@@ -1,6 +1,6 @@
 import UIKit
 
-public typealias NavigationResolver = @MainActor @Sendable (NavigationRequest, any Navigator) throws -> UIViewController
+public typealias NavigationResolver = @MainActor @Sendable (NavigationRequest, NavigationContext) throws -> UIViewController
 
 /// How one module takes part in navigation: its target, its resolver, and which deep links its root
 /// screen handles itself. Each feature owns one as a plain value; the app shell only lists them.

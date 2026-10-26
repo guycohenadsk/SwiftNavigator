@@ -6,9 +6,10 @@ public enum ScreenBNavigationContract {
 
     public enum Route: Hashable {
         case home
+        case b2
     }
 
-    /// Screen B's inner screens, pushed by Screen B itself as local entries.
+    /// Screen B's inner screens, pushed by Screen B itself and resolved by its registration.
     public enum Screen: String {
         case b2
     }

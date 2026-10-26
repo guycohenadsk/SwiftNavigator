@@ -5,7 +5,7 @@ import Foundation
 /// Production splits this into a light list model and a details model because they come from
 /// different SQL joins. Here there is one JSON file, so one struct — the detail screen simply
 /// renders more of it.
-public struct Issue: Identifiable, Codable, Equatable, Sendable {
+public struct Issue: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     /// `nil` on a freshly created issue — the row then reads "New - …" instead of "#928 - …".
     public var number: Int?

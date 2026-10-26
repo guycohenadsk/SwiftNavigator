@@ -26,9 +26,6 @@ private final class CompletionSpy: Navigator {
 
     /// Feeds deep-link actions to whichever list subscribed.
     private(set) var actionContinuation: AsyncStream<NavigationRequest>.Continuation?
-    func push(local request: NavigationRequest, from origin: UIViewController, screen: @escaping @MainActor () -> UIViewController, onDismiss: @escaping @MainActor () -> Void) -> NavigationEntry.ID { NavigationEntry.ID() }
-    func present(local request: NavigationRequest, screen: @escaping @MainActor () -> UIViewController, onDismiss: @escaping @MainActor () -> Void) -> NavigationEntry.ID { NavigationEntry.ID() }
-    func remove(_ id: NavigationEntry.ID) {}
 
     func incomingRequests(for target: NavigationTarget) -> AsyncStream<NavigationRequest> {
         let (stream, continuation) = AsyncStream<NavigationRequest>.makeStream()
@@ -57,7 +54,7 @@ struct IssuesPickerTests {
         await store.finish()
 
         #expect(spy.results == [.selectedEntity(EntityRef(target: .issues, id: issue.id.uuidString, title: issue.rowTitle))])
-        #expect(store.state.detail == nil)
+        #expect(spy.pushed.isEmpty)
     }
 }
 
@@ -150,10 +147,13 @@ struct IssuesScreenCContextTests {
         spy.actionContinuation?.yield(NavigationRequest(intent: .open(EntityRef(target: .issues, id: UUID().uuidString, title: ""))))
         await store.receive(\.incomingRequest)
 
+        #expect(spy.pushed.isEmpty)
+
         spy.actionContinuation?.yield(NavigationRequest(intent: .open(Issues.ref(for: issue))))
-        await store.receive(\.incomingRequest) {
-            $0.detail = IssuesDetail.State(issue: Shared($0.$issues[id: issue.id])!)
-        }
+        await store.receive(\.incomingRequest)
+        while spy.pushed.isEmpty { await Task.yield() }
+        #expect(spy.pushed == [Issues.detailRequest(for: issue)])
+        spy.pushedHandler?(.dismissed)
 
         spy.actionContinuation?.finish()
         await store.finish()

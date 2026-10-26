@@ -17,30 +17,6 @@ public protocol Navigator: Sendable {
     func pop()
     func popToRoot()
     func dismiss()
-    /// Pushes a screen whose state its parent owns (an in-module child, e.g. Issues list → detail)
-    /// onto the stack that holds `origin`, right on top. `request` names what it shows, so the entry
-    /// is data like any other; `screen` builds it from the parent's state. `onDismiss` fires once,
-    /// however the entry leaves — pop, swipe-back, deep-link reset, or an entry below it going —
-    /// but not when the parent removes it with `remove(_:)`. Returns the entry's id.
-    @discardableResult
-    func push(
-        local request: NavigationRequest,
-        from origin: UIViewController,
-        screen: @escaping @MainActor () -> UIViewController,
-        onDismiss: @escaping @MainActor () -> Void
-    ) -> NavigationEntry.ID
-    /// Presents a screen whose state its parent owns in a new modal stack, as an entry named
-    /// `request`. `onDismiss` fires once, however the modal leaves — swipe-down, `dismiss()`, a deep
-    /// link — but not when the parent removes it with `remove(_:)`. Returns the entry's id.
-    @discardableResult
-    func present(
-        local request: NavigationRequest,
-        screen: @escaping @MainActor () -> UIViewController,
-        onDismiss: @escaping @MainActor () -> Void
-    ) -> NavigationEntry.ID
-    /// Removes the entry `id` and everything pushed above it, wherever it is. Used by a parent
-    /// whose child state went away. Does nothing if the entry is already gone.
-    func remove(_ id: NavigationEntry.ID)
     /// Deep links for `target` that its root screen handles itself: `.perform` actions, and requests
     /// its registration sends to the root (`deepLinksToRoot`, e.g. Issues' `.open`, so a linked issue
     /// opens as a child of the list). Delivered to the screen at the root of the stack the link lands
@@ -117,3 +93,4 @@ extension Navigator {
         return .dismissed
     }
 }
+

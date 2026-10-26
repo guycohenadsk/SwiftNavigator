@@ -9,5 +9,7 @@ public enum IssuesNavigationContract {
         case list
         case picker
         case details(id: String)
+        /// The list's own detail: it reports edits and deletion back to the list as outputs.
+        case listDetails(id: String)
     }
 }

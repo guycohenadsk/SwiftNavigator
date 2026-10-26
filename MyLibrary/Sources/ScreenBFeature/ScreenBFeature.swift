@@ -7,7 +7,6 @@ import ScreenBNavigationContract
 public struct ScreenBFeature {
     @ObservableState
     public struct State: Equatable {
-        @Presents public var screenB2: ScreenB2Feature.State?
         /// The issue picked through the Issues picker — a result travelling back across modules,
         /// with nothing shared but NavigationCore.
         public var linkedIssue: EntityRef?
@@ -22,11 +21,9 @@ public struct ScreenBFeature {
         case openIssuesTapped
         case openScreenDTapped
         case pushScreenB2Tapped
-        case screenB2(PresentationAction<ScreenB2Feature.Action>)
     }
 
     @Dependency(\.navigator) var navigator
-    @Dependency(\.childNavigator) var childNavigator
 
     public init() {}
 
@@ -60,16 +57,10 @@ public struct ScreenBFeature {
                 return .run { _ in await navigator.push(NavigationRequest(intent: .browse(.screenD))) }
 
             case .pushScreenB2Tapped:
-                state.screenB2 = ScreenB2Feature.State()
-                let childNavigator = childNavigator
-                return .run { _ in await childNavigator.push(ScreenBNavigationContract.request(for: .b2)) }
-
-            case .screenB2:
-                return .none
+                // Screen B keeps no state of B2: the navigator builds it from the request.
+                let navigator = navigator
+                return .run { _ in await navigator.push(ScreenBNavigationContract.request(for: .b2)) }
             }
-        }
-        .ifLet(\.$screenB2, action: \.screenB2) {
-            ScreenB2Feature()
         }
     }
 }

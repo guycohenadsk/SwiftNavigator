@@ -22,6 +22,7 @@ struct TabSpec {
 enum AppComposition {
     static let registrations = [
         Issues.navigationRegistration,
+        Issues.scopeNavigationRegistration,
         ScreenB.navigationRegistration,
         ScreenC.navigationRegistration,
         ScreenD.navigationRegistration,
@@ -29,6 +30,7 @@ enum AppComposition {
 
     static let tabs = [
         TabSpec(root: NavigationRequest(intent: .browse(.issues)), title: "Issues", systemImage: "exclamationmark.bubble"),
+        TabSpec(root: NavigationRequest(intent: .browse(.issuesScope)), title: "Issues (scope)", systemImage: "square.stack.3d.up"),
         TabSpec(root: NavigationRequest(intent: .browse(.screenB)), title: "Screen B", systemImage: "b.circle"),
         TabSpec(root: NavigationRequest(intent: .browse(.screenC)), title: "Screen C", systemImage: "c.circle"),
         TabSpec(root: NavigationRequest(intent: .browse(.screenD)), title: "Screen D", systemImage: "d.circle"),
@@ -54,9 +56,9 @@ enum AppComposition {
             return registry.deepLinksToRoot(request)
         }
 
-        let resolve: (NavigationRequest) -> UIViewController = { request in
+        let resolve: (NavigationRequest, NavigationContext) -> UIViewController = { request, context in
             do {
-                return try registry.resolve(request, navigator: navigator)
+                return try registry.resolve(request, context: context)
             } catch {
                 assertionFailure("Failed to resolve \(request): \(error)")
                 return UIHostingController(rootView: ContentUnavailableView("Can't open \(request.target.rawValue)", systemImage: "exclamationmark.triangle"))
@@ -65,7 +67,7 @@ enum AppComposition {
 
         let tabBarController = NavigatorTabBarController(navigator: navigator)
         tabBarController.viewControllers = tabs.indices.map { index in
-            let stack = makeStack(navigator.tabs[index], root: tabs[index].root, resolve: resolve)
+            let stack = makeStack(navigator.tabs[index], root: tabs[index].root, navigator: navigator, resolve: resolve)
             stack.tabBarItem = UITabBarItem(title: tabs[index].title, image: UIImage(systemName: tabs[index].systemImage), tag: index)
             return stack
         }
@@ -77,12 +79,20 @@ enum AppComposition {
     private static func makeStack(
         _ stack: StackNavigator,
         root: NavigationRequest,
-        rootScreen: (@MainActor () -> UIViewController)? = nil,
-        resolve: @escaping (NavigationRequest) -> UIViewController
+        navigator: AppNavigator,
+        resolve: @escaping (NavigationRequest, NavigationContext) -> UIViewController
     ) -> UIViewController {
-        let controller = NavigationStackController(path: UIBindable(stack).path) { rootScreen?() ?? resolve(root) }
-        controller.navigationDestination(for: NavigationEntry.self) { [weak stack] entry in
-            stack?.localScreen(for: entry.id) ?? resolve(entry.request)
+        let controller = NavigationStackController(path: UIBindable(stack).path) {
+            resolve(root, NavigationContext(navigator: navigator))
+        }
+        // Each entry is resolved with the screen it was pushed from (the stack's top), so a module can
+        // build a child from its parent, and with a hook for when the entry leaves.
+        controller.navigationDestination(for: NavigationEntry.self) { [weak controller, weak stack] entry in
+            resolve(entry.request, NavigationContext(
+                navigator: navigator,
+                parent: controller?.topViewController,
+                onLeave: { stack?.onLeave(entry.id, $0) }
+            ))
         }
         stack.controller = controller
         return controller
@@ -94,10 +104,10 @@ enum AppComposition {
         at level: Int,
         on presenter: UIViewController,
         navigator: AppNavigator,
-        resolve: @escaping (NavigationRequest) -> UIViewController
+        resolve: @escaping (NavigationRequest, NavigationContext) -> UIViewController
     ) {
         presenter.present(item: UIBindable(navigator)[dynamicMember: \AppNavigator.[modalAt: level]]) { modal in
-            let stack = makeStack(modal.stack, root: modal.root.request, rootScreen: modal.localScreen, resolve: resolve)
+            let stack = makeStack(modal.stack, root: modal.root.request, navigator: navigator, resolve: resolve)
             attachModal(at: level + 1, on: stack, navigator: navigator, resolve: resolve)
             return stack
         }

@@ -259,6 +259,78 @@ final class NavigationFlowUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Screen B2"].waitForExistence(timeout: 5))
     }
 
+    // MARK: Issues (scope): the list owns its detail's state and scopes the detail's store
+
+    private var scopeListBar: XCUIElement { app.navigationBars["Issues (scope)"] }
+
+    /// Opens #950 from the scope tab. #950 is opened by no other test.
+    private func openPaintIssueInScopeList() {
+        app.tabBars.buttons["Issues (scope)"].tap()
+        XCTAssertTrue(scopeListBar.waitForExistence(timeout: 5))
+        app.buttons.containing(NSPredicate(format: "label CONTAINS 'Paint touch-up in lobby'")).firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["#950"].waitForExistence(timeout: 5))
+    }
+
+    /// Back clears the list's detail state (`.detail(.dismiss)`), and the same row opens again.
+    @MainActor
+    func testScopeDetailBackThenReopen() {
+        openPaintIssueInScopeList()
+
+        app.navigationBars["#950"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(scopeListBar.waitForExistence(timeout: 5))
+
+        app.buttons.containing(NSPredicate(format: "label CONTAINS 'Paint touch-up in lobby'")).firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["#950"].waitForExistence(timeout: 5))
+    }
+
+    /// Interactive swipe-back clears the state the same way.
+    @MainActor
+    func testScopeDetailSwipeBackThenReopen() {
+        openPaintIssueInScopeList()
+
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)))
+        XCTAssertTrue(scopeListBar.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["#950"].exists)
+
+        app.buttons.containing(NSPredicate(format: "label CONTAINS 'Paint touch-up in lobby'")).firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["#950"].waitForExistence(timeout: 5))
+    }
+
+    /// Delete is the parent's: it clears the state, removes the issue and pops through the navigator.
+    /// Deletes an issue it creates itself, so the seed issues stay put.
+    @MainActor
+    func testScopeDeleteFromDetailReturnsToList() {
+        app.tabBars.buttons["Issues (scope)"].tap()
+        XCTAssertTrue(scopeListBar.waitForExistence(timeout: 5))
+        let newRows = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'New'"))
+        let before = newRows.count
+        app.buttons["add_scope_issue_button"].tap()
+        XCTAssertTrue(app.navigationBars["New"].waitForExistence(timeout: 5))
+
+        app.buttons["more_actions_button"].tap()
+        app.buttons["Delete"].tap()
+        app.alerts.buttons["Delete"].tap()
+
+        XCTAssertTrue(scopeListBar.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["New"].exists)
+        XCTAssertEqual(newRows.count, before)
+    }
+
+    /// `demoapp://issues-scope/<id>` lands on the scope tab and opens the issue as the list's own
+    /// child: back lands on that list. Uses #955, which no other test opens.
+    @MainActor
+    func testScopeDeepLinkOpensIssueInList() throws {
+        app.tabBars.buttons["Screen D"].tap()
+        app.open(try XCTUnwrap(URL(string: "demoapp://issues-scope/00000000-0000-0000-0000-000000000006")))
+        confirmOpenInAppIfAsked()
+
+        XCTAssertTrue(app.navigationBars["#955"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.tabBars.buttons["Issues (scope)"].isSelected)
+        app.navigationBars["#955"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(scopeListBar.waitForExistence(timeout: 5))
+    }
+
     /// The first time a URL targets the app, iOS may ask for confirmation in SpringBoard.
     private func confirmOpenInAppIfAsked() {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")

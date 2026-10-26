@@ -2,6 +2,8 @@ import ComposableArchitecture
 import Foundation
 import IssuesNavigationContract
 import NavigationCore
+import ScreenBNavigationContract
+import SwiftUI
 import Testing
 import UIKit
 
@@ -19,6 +21,19 @@ struct FeatureNavigationTests {
         #expect(try Issues.route(for: NavigationRequest(intent: .browse(.issues))) == .list)
         #expect(try Issues.route(for: NavigationRequest(intent: .selectSingle(.issues))) == .picker)
         #expect(try Issues.route(for: NavigationRequest(intent: .open(issue))) == .details(id: "abc"))
+        #expect(try Issues.route(for: NavigationRequest(intent: .screen(.issues, name: "detail/abc"))) == .listDetails(id: "abc"))
+        #expect(throws: NavigationError.unsupportedIntent) {
+            try Issues.route(for: NavigationRequest(intent: .screen(.issues, name: "other")))
+        }
+    }
+
+    @Test("Screen B maps its .b2 inner screen to B2, and other intents to home")
+    func screenBRoutes() throws {
+        #expect(try ScreenB.route(for: NavigationRequest(intent: .browse(.screenB))) == .home)
+        #expect(try ScreenB.route(for: ScreenBNavigationContract.request(for: .b2)) == .b2)
+        #expect(throws: NavigationError.unsupportedIntent) {
+            try ScreenB.route(for: NavigationRequest(intent: .screen(.screenB, name: "b3")))
+        }
     }
 
     @Test("Every module rejects requests addressed to another module")
@@ -53,6 +68,6 @@ struct FeatureNavigationTests {
         } operation: {
             Issues.viewController(for: .details(id: "not-a-uuid"))
         }
-        #expect(!(controller is IssuesListHostingController))
+        #expect(!(controller is UIHostingController<IssuesDetailView>))
     }
 }

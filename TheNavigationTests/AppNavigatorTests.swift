@@ -1,6 +1,9 @@
 import ComposableArchitecture
 import Foundation
+import IssuesDomain
 import NavigationCore
+import ScreenBFeature
+import SwiftUI
 import Testing
 import UIKit
 
@@ -292,166 +295,86 @@ struct AppNavigatorTests {
     }
 }
 
-/// Entries a parent pushes with `push(local:…)`: its child's state stays with the parent.
+/// A screen closing itself while an alert is still going away: `UINavigationController` ignores a
+/// pop under a presentation, so the entry leaves once nothing covers its stack.
 @MainActor
-@Suite("AppNavigator local entries")
-struct AppNavigatorLocalEntryTests {
-    private let detail = NavigationRequest(intent: .open(EntityRef(target: .issues, id: "42", title: "#42")))
-
-    /// A navigator whose stacks are bound to UIKit controllers, as AppComposition does.
-    private func makeBoundNavigator() -> (AppNavigator, [UINavigationController]) {
+@Suite("AppNavigator removals under a presentation", .serialized)
+struct AppNavigatorCoveredRemovalTests {
+    /// A tab stack shown in a window, with `cover` presented over it from the window's root.
+    private func makeCoveredStack() async throws -> (AppNavigator, UIViewController, UIWindow) {
         let navigator = makeNavigator()
-        let controllers = navigator.tabs.map { stack in
-            let controller = UINavigationController(rootViewController: UIViewController())
-            stack.controller = controller
-            return controller
-        }
-        return (navigator, controllers)
+        let controller = UINavigationController(rootViewController: UIViewController())
+        navigator.tabs[0].controller = controller
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        let cover = UIViewController()
+        controller.present(cover, animated: false)
+        try #require(controller.presentedViewController === cover)
+        return (navigator, cover, window)
     }
 
-    @Test("A local push lands on top of the stack showing the parent, and builds its own screen")
-    func pushesOnParentsStack() throws {
-        let (navigator, controllers) = makeBoundNavigator()
-        let parent = try #require(controllers[0].viewControllers.first)
-        let screen = UIViewController()
-
-        let id = navigator.push(local: detail, from: parent, screen: { screen }, onDismiss: {})
-
-        #expect(navigator.tabs[0].path.map(\.id) == [id])
-        #expect(navigator.tabs[0].path.map(\.request) == [detail])
-        #expect(navigator.tabs[0].localScreen(for: id) === screen)
-    }
-
-    @Test("A local push goes to the parent's stack even when a modal is on top")
-    func pushesUnderModal() throws {
-        let (navigator, controllers) = makeBoundNavigator()
-        navigator.present(screenD)
-
-        let id = navigator.push(local: detail, from: try #require(controllers[0].viewControllers.first), screen: { UIViewController() }, onDismiss: {})
-
-        #expect(navigator.tabs[0].path.map(\.id) == [id])
-        #expect(navigator.modals.first?.stack.path.isEmpty == true)
-    }
-
-    @Test("A parent not on any bound stack falls back to the current stack")
-    func fallsBackToCurrent() {
-        let navigator = makeNavigator()
-        navigator.tabIndex = 1
-        let id = navigator.push(local: detail, from: UIViewController(), screen: { UIViewController() }, onDismiss: {})
-        #expect(navigator.tabs[1].path.map(\.id) == [id])
-    }
-
-    @Test("Popping a local entry calls onDismiss once and forgets its screen")
-    func popDismisses() throws {
-        let (navigator, controllers) = makeBoundNavigator()
-        var dismissals = 0
-        let id = navigator.push(local: detail, from: try #require(controllers[0].viewControllers.first), screen: { UIViewController() }, onDismiss: { dismissals += 1 })
-
-        navigator.pop()
-        navigator.pop()
-
-        #expect(dismissals == 1)
-        #expect(navigator.tabs[0].localScreen(for: id) == nil)
-    }
-
-    @Test("A deep-link reset dismisses local entries too")
-    func resetDismisses() throws {
-        let (navigator, controllers) = makeBoundNavigator()
-        var dismissals = 0
-        navigator.push(local: detail, from: try #require(controllers[0].viewControllers.first), screen: { UIViewController() }, onDismiss: { dismissals += 1 })
-
-        navigator.open(deepLink: NavigationRequest(intent: .browse(.issues)))
-
-        #expect(dismissals == 1)
-        #expect(navigator.tabs[0].path.isEmpty)
-    }
-
-    @Test("remove() takes the entry and everything above it; only the entries above report .dismissed")
-    func removeTakesAbove() throws {
-        let (navigator, controllers) = makeBoundNavigator()
-        var dismissals = 0
+    @Test("complete(with:) reports the result at once, and removes the entry once the cover is gone")
+    func completeWaitsForCover() async throws {
+        let (navigator, _, window) = try await makeCoveredStack()
         let log = ResultLog()
-        let id = navigator.push(local: detail, from: try #require(controllers[0].viewControllers.first), screen: { UIViewController() }, onDismiss: { dismissals += 1 })
         navigator.push(screenC, onResult: log.handler)
 
-        navigator.remove(id)
+        navigator.complete(with: .dismissed)
 
-        #expect(navigator.tabs[0].path.isEmpty)
-        #expect(dismissals == 0)
         #expect(log.results == [.dismissed])
-        #expect(navigator.tabs[0].localScreen(for: id) == nil)
-    }
-
-    @Test("A local entry the child completes itself (a final result) still calls onDismiss")
-    func completeDismisses() throws {
-        let (navigator, controllers) = makeBoundNavigator()
-        var dismissals = 0
-        navigator.push(local: detail, from: try #require(controllers[0].viewControllers.first), screen: { UIViewController() }, onDismiss: { dismissals += 1 })
-
-        navigator.complete(with: .selectedEntity(EntityRef(target: .issues, id: "1", title: "")))
-
-        #expect(dismissals == 1)
+        // The cover was up and not leaving, so it is closed; the entry goes after it.
+        for _ in 0..<60 where !navigator.tabs[0].path.isEmpty {
+            try await Task.sleep(for: .milliseconds(50))
+        }
         #expect(navigator.tabs[0].path.isEmpty)
+        #expect(window.rootViewController?.presentedViewController == nil)
+        #expect(log.results == [.dismissed])
     }
 
-    @Test("present(local:) opens a modal whose root is the parent's screen; leaving it calls onDismiss")
-    func presentLocal() {
+    @Test("Without a window (or with nothing covering) complete and pop remove at once")
+    func uncoveredRemovesAtOnce() {
         let navigator = makeNavigator()
-        var dismissals = 0
-        let screen = UIViewController()
-
-        let id = navigator.present(local: detail, screen: { screen }, onDismiss: { dismissals += 1 })
-
-        #expect(navigator.modals.map(\.root.id) == [id])
-        #expect(navigator.modals.first?.root.request == detail)
-        #expect(navigator.modals.first?.localScreen?() === screen)
-
-        navigator.dismiss()
-        #expect(dismissals == 1)
-        #expect(navigator.modals.isEmpty)
-    }
-
-    @Test("A locally presented modal also reports a swipe-down and a deep-link reset")
-    func presentLocalReset() {
-        let navigator = makeNavigator()
-        var dismissals = 0
-        navigator.present(local: detail, screen: { UIViewController() }, onDismiss: { dismissals += 1 })
-        navigator[modalAt: 0] = nil   // swipe-down
-        #expect(dismissals == 1)
-
-        navigator.present(local: detail, screen: { UIViewController() }, onDismiss: { dismissals += 1 })
-        navigator.open(deepLink: NavigationRequest(intent: .browse(.screenB)))
-        #expect(dismissals == 2)
-    }
-
-    @Test("remove() of a locally presented modal takes it and every modal above, reporting only those above")
-    func removePresentedLocal() {
-        let navigator = makeNavigator()
-        var dismissals = 0
         let log = ResultLog()
-        let id = navigator.present(local: detail, screen: { UIViewController() }, onDismiss: { dismissals += 1 })
-        navigator.present(screenC, onResult: log.handler)
+        navigator.push(screenC, onResult: log.handler)
+        navigator.push(screenD)
 
-        navigator.remove(id)
-
-        #expect(navigator.modals.isEmpty)
-        #expect(dismissals == 0)
-        #expect(log.results == [.dismissed])
-    }
-
-    @Test("remove() finds the entry on a background tab, and ignores ids that are gone")
-    func removeAnywhere() throws {
-        let (navigator, controllers) = makeBoundNavigator()
-        let id = navigator.push(local: detail, from: try #require(controllers[0].viewControllers.first), screen: { UIViewController() }, onDismiss: {})
-        navigator.tabIndex = 1
-        navigator.push(screenC)
-
-        navigator.remove(id)
-        navigator.remove(id)
-        navigator.remove(NavigationEntry.ID())
-
+        navigator.pop()
+        #expect(navigator.tabs[0].path.map(\.request) == [screenC])
+        navigator.complete(with: .selectedEntity(issue))
         #expect(navigator.tabs[0].path.isEmpty)
-        #expect(navigator.tabs[1].path.map(\.request) == [screenC])
+        #expect(log.results == [.selectedEntity(issue)])
+    }
+}
+
+/// `NavigationContext.onLeave`, as AppComposition ties it to an entry: it runs once, however the
+/// entry leaves.
+@MainActor
+@Suite("AppNavigator entry leave actions")
+struct AppNavigatorLeaveTests {
+    private let request = NavigationRequest(intent: .screen(.issuesScope, name: "detail/x"))
+
+    @Test("onLeave runs once for a pop, a complete and a deep-link reset; never for entries still there")
+    func onLeaveFiresOnce() {
+        let navigator = makeNavigator()
+        let stack = navigator.tabs[0]
+        var leaves = 0
+        let leaving: [() -> Void] = [
+            { navigator.pop() },
+            { navigator.complete(with: .dismissed) },
+            { navigator.open(deepLink: NavigationRequest(intent: .browse(.issues))) },
+        ]
+
+        for leave in leaving {
+            navigator.push(request)
+            stack.onLeave(stack.path.last!.id) { leaves += 1 }
+            navigator.push(screenC)
+            navigator.pop()
+            #expect(stack.path.map(\.request) == [request])
+            leave()
+        }
+        #expect(stack.path.isEmpty)
+        #expect(leaves == 3)
     }
 }
 
@@ -470,6 +393,28 @@ struct AppCompositionTests {
     func everyTargetRegistered() throws {
         let registry = try AppComposition.makeRegistry()
         #expect(registry.registeredTargets == Set(NavigationTarget.allCases))
+    }
+
+    @Test("Modules' inner screens resolve from their requests")
+    func innerScreensResolve() throws {
+        let registry = try AppComposition.makeRegistry()
+        let stored = Issue(title: "Stored")
+        let (detail, b2, unknown) = withDependencies {
+            $0.defaultFileStorage = .inMemory
+        } operation: {
+            @Shared(.issues) var issues
+            $issues.withLock { $0 = [stored] }
+            let navigator = makeNavigator()
+            let resolve = { (intent: NavigationIntent) in try? registry.resolve(NavigationRequest(intent: intent), navigator: navigator) }
+            return (
+                resolve(.screen(.issues, name: "detail/\(stored.id.uuidString)")),
+                resolve(.screen(.screenB, name: "b2")),
+                resolve(.screen(.screenB, name: "nope"))
+            )
+        }
+        #expect(detail is UIHostingController<IssuesDetailView>)
+        #expect(b2 is UIHostingController<ScreenB2View>)
+        #expect(unknown == nil)
     }
 
     @Test("Every tab root resolves")

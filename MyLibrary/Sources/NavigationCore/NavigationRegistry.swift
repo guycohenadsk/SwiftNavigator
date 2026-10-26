@@ -24,10 +24,15 @@ public final class NavigationRegistry {
         Set(resolvers.keys)
     }
 
-    public func resolve(_ request: NavigationRequest, navigator: any Navigator) throws -> UIViewController {
+    public func resolve(_ request: NavigationRequest, context: NavigationContext) throws -> UIViewController {
         guard let resolver = resolvers[request.target] else {
             throw NavigationError.unregisteredTarget(request.target)
         }
-        return try resolver(request, navigator)
+        return try resolver(request, context)
+    }
+
+    /// Resolves `request` with no parent, as a stack's root.
+    public func resolve(_ request: NavigationRequest, navigator: any Navigator) throws -> UIViewController {
+        try resolve(request, context: NavigationContext(navigator: navigator))
     }
 }

@@ -8,138 +8,103 @@ import UIKit
 
 @testable import IssuesDomain
 
-/// Records the detail pushes the list makes through the navigator, and the entries it removes.
+/// The detail as the navigator builds it from a request: the list's own detail reports to the list
+/// through outputs; a detail opened by another module saves and deletes on its own.
 @MainActor
-private final class DetailNavigatorSpy: Navigator {
-    struct LocalPush {
-        let id: NavigationEntry.ID
-        let request: NavigationRequest
-        let screen: @MainActor () -> UIViewController
-        let onDismiss: @MainActor () -> Void
-    }
-
-    private(set) var pushes: [LocalPush] = []
-    private(set) var removed: [NavigationEntry.ID] = []
-
-    func push(
-        local request: NavigationRequest,
-        from origin: UIViewController,
-        screen: @escaping @MainActor () -> UIViewController,
-        onDismiss: @escaping @MainActor () -> Void
-    ) -> NavigationEntry.ID {
-        let push = LocalPush(id: NavigationEntry.ID(), request: request, screen: screen, onDismiss: onDismiss)
-        pushes.append(push)
-        return push.id
-    }
-
-    func remove(_ id: NavigationEntry.ID) { removed.append(id) }
-
-    func present(local request: NavigationRequest, screen: @escaping @MainActor () -> UIViewController, onDismiss: @escaping @MainActor () -> Void) -> NavigationEntry.ID { NavigationEntry.ID() }
-
-
-    func push(_ request: NavigationRequest, onResult: NavigationResultHandler?) {}
-    func present(_ request: NavigationRequest, onResult: NavigationResultHandler?) {}
-    func send(_ result: NavigationResult) {}
-    func complete(with result: NavigationResult) {}
-    func pop() {}
-    func popToRoot() {}
-    func dismiss() {}
-    func incomingRequests(for target: NavigationTarget) -> AsyncStream<NavigationRequest> { AsyncStream { _ in } }
-}
-
-@MainActor
-private func settle() async {
-    for _ in 0..<20 { await Task.yield() }
-}
-
-/// The list's detail travels through the navigator, while its state stays in the list.
-@MainActor
-@Suite("Issues list → detail through the navigator", .serialized)
+@Suite("Issue detail built from its request", .serialized)
 struct IssuesDetailNavigationTests {
-    private let spy = DetailNavigatorSpy()
-    let store: StoreOf<IssuesList>
-    let controller: IssuesListHostingController
+    private let navigator = NavigatorSpy()
 
-    init() {
-        let spy = spy
-        (store, controller) = withDependencies {
+    /// The store, its issue, and the stored issues, which live in in-memory storage.
+    private func makeStore(reportsToOpener: Bool) -> (TestStoreOf<IssueDetailScreen>, IssuesDomain.Issue, Shared<IdentifiedArrayOf<IssuesDomain.Issue>>) {
+        let navigator = navigator
+        return withDependencies {
             $0.defaultFileStorage = .inMemory
-            $0.navigator = spy
+            $0.navigator = navigator
         } operation: {
             @Shared(.issues) var issues
             $issues.withLock { $0 = Issue.seed }
-            let controller = IssuesListHostingController(initialState: IssuesList.State())
-            return (controller.store, controller)
+            let issue = issues[0]
+            let shared = reportsToOpener ? Shared(value: issue) : Shared($issues[id: issue.id])!
+            let store = TestStore(initialState: IssueDetailScreen.State(issue: shared, reportsToOpener: reportsToOpener)) {
+                IssueDetailScreen()
+            }
+            return (store, issue, $issues)
         }
-        controller.loadViewIfNeeded()
     }
 
-    private var firstIssue: IssuesDomain.Issue { store.issues[0] }
+    @Test("The list's detail works on a copy and sends every edit as an .edited output")
+    func listDetailReportsEdits() async {
+        let (store, issue, issues) = makeStore(reportsToOpener: true)
 
-    @Test("Tapping a row sets the list's detail state, and the reducer pushes it as an .open entry")
-    func tapPushes() async throws {
-        store.send(.issueTapped(firstIssue.id))
-        await settle()
+        var renamed = issue
+        renamed.title = "Renamed"
+        await store.send(.detail(.titleChanged("Renamed"))) {
+            $0.detail.$issue.withLock { $0.title = "Renamed" }
+            $0.reportedIssue = renamed
+        }
+        await store.finish()
 
-        #expect(store.detail?.issue.id == firstIssue.id)
-        #expect(controller.childNavigator.history == [ChildPush(Issues.detailRequest(for: firstIssue))])
-        let push = try #require(spy.pushes.first)
-        #expect(spy.pushes.count == 1)
-        #expect(push.request == NavigationRequest(intent: .open(Issues.ref(for: firstIssue))))
-        #expect(push.screen() is UIHostingController<IssuesDetailView>)
+        #expect(navigator.sent == [.output(NavigationOutput(IssuesDetail.Output.edited(renamed)))])
+        #expect(issues.wrappedValue[id: issue.id]?.title == issue.title)
     }
 
-    @Test("Leaving the detail (back, swipe, reset) clears the list's detail state")
-    func dismissClearsState() async throws {
-        store.send(.issueTapped(firstIssue.id))
-        await settle()
+    @Test("The list's detail asks the list to delete, then closes itself; storage is the list's job")
+    func listDetailRequestsDelete() async {
+        let (store, issue, issues) = makeStore(reportsToOpener: true)
+        store.exhaustivity = .off
 
-        try #require(spy.pushes.first).onDismiss()
-        await settle()
+        await store.send(.detail(.deleteButtonTapped))
+        await store.send(.detail(.alert(.presented(.confirmDelete))))
+        await store.receive(\.detail.delegate.deleteRequested)
+        await store.finish()
 
-        #expect(store.detail == nil)
-        #expect(spy.removed.isEmpty)
+        #expect(navigator.sent == [.output(NavigationOutput(IssuesDetail.Output.deleteRequested(issue.id)))])
+        #expect(navigator.completed == [.dismissed])
+        #expect(issues.wrappedValue[id: issue.id] != nil)
     }
 
-    @Test("The detail asking its parent to delete: the list clears state and the entry is removed")
-    func deleteRemovesEntry() async throws {
-        let issue = firstIssue
-        store.send(.issueTapped(issue.id))
-        await settle()
-        let push = try #require(spy.pushes.first)
+    @Test("A detail opened by another module edits the stored issue and reports nothing")
+    func standaloneDetailSavesItself() async {
+        let (store, issue, issues) = makeStore(reportsToOpener: false)
 
-        store.send(.detail(.presented(.delegate(.deleteRequested))))
-        await settle()
+        await store.send(.detail(.titleChanged("Renamed"))) {
+            $0.detail.$issue.withLock { $0.title = "Renamed" }
+        }
+        await store.finish()
 
-        #expect(store.detail == nil)
-        #expect(store.issues[id: issue.id] == nil)
-        #expect(spy.removed == [push.id])
+        #expect(navigator.sent.isEmpty)
+        #expect(issues.wrappedValue[id: issue.id]?.title == "Renamed")
     }
 
-    @Test("Editing the detail's issue keeps the same entry")
-    func editKeepsEntry() async {
-        store.send(.issueTapped(firstIssue.id))
-        await settle()
+    @Test("A detail opened by another module deletes the issue itself, then closes")
+    func standaloneDetailDeletesItself() async {
+        let (store, issue, issues) = makeStore(reportsToOpener: false)
+        store.exhaustivity = .off
 
-        store.send(.detail(.presented(.titleChanged("Renamed"))))
-        await settle()
+        await store.send(.detail(.deleteButtonTapped))
+        await store.send(.detail(.alert(.presented(.confirmDelete))))
+        await store.receive(\.detail.delegate.deleteRequested)
+        await store.finish()
 
-        #expect(store.detail?.issue.title == "Renamed")
-        #expect(spy.pushes.count == 1)
-        #expect(spy.removed.isEmpty)
+        #expect(navigator.sent.isEmpty)
+        #expect(navigator.completed == [.dismissed])
+        #expect(issues.wrappedValue[id: issue.id] == nil)
     }
 
-    @Test("Opening another issue after leaving pushes a fresh entry")
-    func reopen() async throws {
-        store.send(.issueTapped(firstIssue.id))
-        await settle()
-        try #require(spy.pushes.first).onDismiss()
-        await settle()
-
-        store.send(.issueTapped(store.issues[1].id))
-        await settle()
-
-        #expect(spy.pushes.count == 2)
-        #expect(store.detail?.issue.id == store.issues[1].id)
+    @Test("The resolver builds the detail from either request, and a not-found screen for unknown ids")
+    func resolverBuildsFromRequest() throws {
+        try withDependencies {
+            $0.defaultFileStorage = .inMemory
+        } operation: {
+            @Shared(.issues) var issues
+            $issues.withLock { $0 = Issue.seed }
+            let issue = issues[0]
+            let list = try Issues.viewController(for: Issues.route(for: Issues.detailRequest(for: issue)))
+            let open = try Issues.viewController(for: Issues.route(for: NavigationRequest(intent: .open(Issues.ref(for: issue)))))
+            #expect(list is UIHostingController<IssuesDetailView>)
+            #expect(open is UIHostingController<IssuesDetailView>)
+            #expect(!(Issues.viewController(for: .listDetails(id: UUID().uuidString)) is UIHostingController<IssuesDetailView>))
+        }
     }
 }
