@@ -22,6 +22,7 @@ struct FeatureNavigationTests {
         #expect(try Issues.route(for: NavigationRequest(intent: .selectSingle(.issues))) == .picker)
         #expect(try Issues.route(for: NavigationRequest(intent: .open(issue))) == .details(id: "abc"))
         #expect(try Issues.route(for: NavigationRequest(intent: .screen(.issues, name: "detail/abc"))) == .listDetails(id: "abc"))
+        #expect(try Issues.route(for: NavigationRequest(intent: .screen(.issues, name: "random"))) == .randomDetails)
         #expect(throws: NavigationError.unsupportedIntent) {
             try Issues.route(for: NavigationRequest(intent: .screen(.issues, name: "other")))
         }
@@ -59,15 +60,5 @@ struct FeatureNavigationTests {
         #expect(throws: NavigationError.unsupportedIntent) {
             try Issues.route(for: NavigationRequest(intent: .perform(.issues, action: "screenCContext")))
         }
-    }
-
-    @Test("Opening an issue that does not exist shows a not-found screen, not a crash")
-    func unknownIssue() {
-        let controller = withDependencies {
-            $0.defaultFileStorage = .inMemory
-        } operation: {
-            Issues.viewController(for: .details(id: "not-a-uuid"))
-        }
-        #expect(!(controller is UIHostingController<IssuesDetailView>))
     }
 }

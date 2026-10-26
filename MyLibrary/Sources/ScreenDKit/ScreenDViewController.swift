@@ -56,6 +56,12 @@ public final class ScreenDViewController: UIViewController {
             navigationButton("Open Issues") { [navigator] in
                 navigator.push(NavigationRequest(intent: .browse(.issues)))
             },
+            navigationButton("Pick an issue, then open it") { [navigator] in
+                navigator.present(NavigationRequest(intent: .selectSingle(.issues))) { result in
+                    guard case let .selectedEntity(issue) = result else { return }
+                    navigator.push(NavigationRequest(intent: .open(issue)))
+                }
+            },
             navigationButton("Open Screen B · sheet") { [navigator] in
                 navigator.present(NavigationRequest(intent: .browse(.screenB)))
             },

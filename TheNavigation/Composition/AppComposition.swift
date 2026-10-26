@@ -22,7 +22,6 @@ struct TabSpec {
 enum AppComposition {
     static let registrations = [
         Issues.navigationRegistration,
-        Issues.scopeNavigationRegistration,
         ScreenB.navigationRegistration,
         ScreenC.navigationRegistration,
         ScreenD.navigationRegistration,
@@ -30,7 +29,6 @@ enum AppComposition {
 
     static let tabs = [
         TabSpec(root: NavigationRequest(intent: .browse(.issues)), title: "Issues", systemImage: "exclamationmark.bubble"),
-        TabSpec(root: NavigationRequest(intent: .browse(.issuesScope)), title: "Issues (scope)", systemImage: "square.stack.3d.up"),
         TabSpec(root: NavigationRequest(intent: .browse(.screenB)), title: "Screen B", systemImage: "b.circle"),
         TabSpec(root: NavigationRequest(intent: .browse(.screenC)), title: "Screen C", systemImage: "c.circle"),
         TabSpec(root: NavigationRequest(intent: .browse(.screenD)), title: "Screen D", systemImage: "d.circle"),

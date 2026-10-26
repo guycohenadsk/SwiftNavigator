@@ -150,10 +150,11 @@ struct IssuesScreenCContextTests {
         #expect(spy.pushed.isEmpty)
 
         spy.actionContinuation?.yield(NavigationRequest(intent: .open(Issues.ref(for: issue))))
-        await store.receive(\.incomingRequest)
+        await store.receive(\.incomingRequest) {
+            $0.detail = IssuesDetail.State(issue: Shared(value: issue))
+        }
         while spy.pushed.isEmpty { await Task.yield() }
         #expect(spy.pushed == [Issues.detailRequest(for: issue)])
-        spy.pushedHandler?(.dismissed)
 
         spy.actionContinuation?.finish()
         await store.finish()

@@ -259,76 +259,72 @@ final class NavigationFlowUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Screen B2"].waitForExistence(timeout: 5))
     }
 
-    // MARK: Issues (scope): the list owns its detail's state and scopes the detail's store
+    // MARK: - Issue detail opened from other screens
 
-    private var scopeListBar: XCUIElement { app.navigationBars["Issues (scope)"] }
+    /// Random issue (header) pushes a standalone detail of a random stored issue (`.details(id:)`),
+    /// not the list's child; back returns to the list.
+    @MainActor
+    func testRandomIssueOpensADetail() {
+        inScreenButton("Random issue").tap()
+        XCTAssertTrue(app.buttons["more_actions_button"].waitForExistence(timeout: 5))
+        XCTAssertFalse(issuesListBar.exists)
 
-    /// Opens #950 from the scope tab. #950 is opened by no other test.
-    private func openPaintIssueInScopeList() {
-        app.tabBars.buttons["Issues (scope)"].tap()
-        XCTAssertTrue(scopeListBar.waitForExistence(timeout: 5))
-        app.buttons.containing(NSPredicate(format: "label CONTAINS 'Paint touch-up in lobby'")).firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["#950"].waitForExistence(timeout: 5))
+        app.navigationBars.element(boundBy: 0).buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(issuesListBar.waitForExistence(timeout: 5))
     }
 
-    /// Back clears the list's detail state (`.detail(.dismiss)`), and the same row opens again.
+    /// Screen B links an issue through the picker, then opens it on its own stack.
     @MainActor
-    func testScopeDetailBackThenReopen() {
-        openPaintIssueInScopeList()
+    func testScreenBOpensLinkedIssue() {
+        app.tabBars.buttons["Screen B"].tap()
+        app.buttons["Link an issue"].tap()
+        pick("Wall crack at grid C4")
+        app.buttons.containing(NSPredicate(format: "label CONTAINS 'Wall crack at grid C4'")).firstMatch.tap()
 
-        app.navigationBars["#950"].buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(scopeListBar.waitForExistence(timeout: 5))
-
-        app.buttons.containing(NSPredicate(format: "label CONTAINS 'Paint touch-up in lobby'")).firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["#950"].waitForExistence(timeout: 5))
+        editOpenedIssue("#942", title: "Wall crack at grid C4", backTo: "Screen B")
     }
 
-    /// Interactive swipe-back clears the state the same way.
+    /// Screen C (UIKit) picks an issue, then pushes its detail on its own stack.
     @MainActor
-    func testScopeDetailSwipeBackThenReopen() {
-        openPaintIssueInScopeList()
+    func testScreenCPicksThenOpensIssue() {
+        app.tabBars.buttons["Screen C"].tap()
+        app.buttons["Pick an issue, then open it"].tap()
+        pick("Paint touch-up in lobby")
 
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.5))
-        start.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)))
-        XCTAssertTrue(scopeListBar.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.navigationBars["#950"].exists)
-
-        app.buttons.containing(NSPredicate(format: "label CONTAINS 'Paint touch-up in lobby'")).firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["#950"].waitForExistence(timeout: 5))
+        editOpenedIssue("#950", title: "Paint touch-up in lobby", backTo: "Screen C")
     }
 
-    /// Delete is the parent's: it clears the state, removes the issue and pops through the navigator.
-    /// Deletes an issue it creates itself, so the seed issues stay put.
+    /// Screen D (UIKit) does the same.
     @MainActor
-    func testScopeDeleteFromDetailReturnsToList() {
-        app.tabBars.buttons["Issues (scope)"].tap()
-        XCTAssertTrue(scopeListBar.waitForExistence(timeout: 5))
-        let newRows = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'New'"))
-        let before = newRows.count
-        app.buttons["add_scope_issue_button"].tap()
-        XCTAssertTrue(app.navigationBars["New"].waitForExistence(timeout: 5))
-
-        app.buttons["more_actions_button"].tap()
-        app.buttons["Delete"].tap()
-        app.alerts.buttons["Delete"].tap()
-
-        XCTAssertTrue(scopeListBar.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.navigationBars["New"].exists)
-        XCTAssertEqual(newRows.count, before)
-    }
-
-    /// `demoapp://issues-scope/<id>` lands on the scope tab and opens the issue as the list's own
-    /// child: back lands on that list. Uses #955, which no other test opens.
-    @MainActor
-    func testScopeDeepLinkOpensIssueInList() throws {
+    func testScreenDPicksThenOpensIssue() {
         app.tabBars.buttons["Screen D"].tap()
-        app.open(try XCTUnwrap(URL(string: "demoapp://issues-scope/00000000-0000-0000-0000-000000000006")))
-        confirmOpenInAppIfAsked()
+        app.buttons["Pick an issue, then open it"].tap()
+        pick("Fire damper access panel")
 
-        XCTAssertTrue(app.navigationBars["#955"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.tabBars.buttons["Issues (scope)"].isSelected)
-        app.navigationBars["#955"].buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(scopeListBar.waitForExistence(timeout: 5))
+        editOpenedIssue("#955", title: "Fire damper access panel", backTo: "Screen D")
+    }
+
+    private func pick(_ title: String) {
+        XCTAssertTrue(app.navigationBars["Pick an issue"].waitForExistence(timeout: 5))
+        app.buttons.containing(NSPredicate(format: "label CONTAINS %@", title)).firstMatch.tap()
+    }
+
+    /// The detail opened by another screen saves to the stored issue: an edit made there shows in
+    /// the Issues tab, and back returns to the screen that opened it. Appends a fresh suffix, so the
+    /// test passes again without reinstalling.
+    private func editOpenedIssue(_ number: String, title: String, backTo screen: String) {
+        XCTAssertTrue(app.navigationBars[number].waitForExistence(timeout: 5))
+        let suffix = " \(UUID().uuidString.prefix(4))"
+        let field = app.descendants(matching: .any)["issue_title_field"]
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.99, dy: 0.5)).tap()
+        field.typeText(suffix)
+
+        app.navigationBars[number].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars[screen].waitForExistence(timeout: 5))
+
+        app.tabBars.buttons["Issues"].tap()
+        XCTAssertTrue(issuesListBar.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS %@", suffix)).firstMatch.waitForExistence(timeout: 5))
     }
 
     /// The first time a URL targets the app, iOS may ask for confirmation in SpringBoard.

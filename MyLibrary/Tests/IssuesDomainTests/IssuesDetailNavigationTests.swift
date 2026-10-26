@@ -8,15 +8,15 @@ import UIKit
 
 @testable import IssuesDomain
 
-/// The detail as the navigator builds it from a request: the list's own detail reports to the list
-/// through outputs; a detail opened by another module saves and deletes on its own.
+/// The detail as another module opens it (`.open`): nobody owns it, so it saves and deletes on its
+/// own.
 @MainActor
-@Suite("Issue detail built from its request", .serialized)
+@Suite("Issue detail opened by another module", .serialized)
 struct IssuesDetailNavigationTests {
     private let navigator = NavigatorSpy()
 
     /// The store, its issue, and the stored issues, which live in in-memory storage.
-    private func makeStore(reportsToOpener: Bool) -> (TestStoreOf<IssueDetailScreen>, IssuesDomain.Issue, Shared<IdentifiedArrayOf<IssuesDomain.Issue>>) {
+    private func makeStore() -> (TestStoreOf<IssueDetailScreen>, IssuesDomain.Issue, Shared<IdentifiedArrayOf<IssuesDomain.Issue>>) {
         let navigator = navigator
         return withDependencies {
             $0.defaultFileStorage = .inMemory
@@ -25,48 +25,16 @@ struct IssuesDetailNavigationTests {
             @Shared(.issues) var issues
             $issues.withLock { $0 = Issue.seed }
             let issue = issues[0]
-            let shared = reportsToOpener ? Shared(value: issue) : Shared($issues[id: issue.id])!
-            let store = TestStore(initialState: IssueDetailScreen.State(issue: shared, reportsToOpener: reportsToOpener)) {
+            let store = TestStore(initialState: IssueDetailScreen.State(issue: Shared($issues[id: issue.id])!)) {
                 IssueDetailScreen()
             }
             return (store, issue, $issues)
         }
     }
 
-    @Test("The list's detail works on a copy and sends every edit as an .edited output")
-    func listDetailReportsEdits() async {
-        let (store, issue, issues) = makeStore(reportsToOpener: true)
-
-        var renamed = issue
-        renamed.title = "Renamed"
-        await store.send(.detail(.titleChanged("Renamed"))) {
-            $0.detail.$issue.withLock { $0.title = "Renamed" }
-            $0.reportedIssue = renamed
-        }
-        await store.finish()
-
-        #expect(navigator.sent == [.output(NavigationOutput(IssuesDetail.Output.edited(renamed)))])
-        #expect(issues.wrappedValue[id: issue.id]?.title == issue.title)
-    }
-
-    @Test("The list's detail asks the list to delete, then closes itself; storage is the list's job")
-    func listDetailRequestsDelete() async {
-        let (store, issue, issues) = makeStore(reportsToOpener: true)
-        store.exhaustivity = .off
-
-        await store.send(.detail(.deleteButtonTapped))
-        await store.send(.detail(.alert(.presented(.confirmDelete))))
-        await store.receive(\.detail.delegate.deleteRequested)
-        await store.finish()
-
-        #expect(navigator.sent == [.output(NavigationOutput(IssuesDetail.Output.deleteRequested(issue.id)))])
-        #expect(navigator.completed == [.dismissed])
-        #expect(issues.wrappedValue[id: issue.id] != nil)
-    }
-
-    @Test("A detail opened by another module edits the stored issue and reports nothing")
-    func standaloneDetailSavesItself() async {
-        let (store, issue, issues) = makeStore(reportsToOpener: false)
+    @Test("Its edits go straight to the stored issue, with nothing sent back")
+    func savesItself() async {
+        let (store, issue, issues) = makeStore()
 
         await store.send(.detail(.titleChanged("Renamed"))) {
             $0.detail.$issue.withLock { $0.title = "Renamed" }
@@ -77,9 +45,9 @@ struct IssuesDetailNavigationTests {
         #expect(issues.wrappedValue[id: issue.id]?.title == "Renamed")
     }
 
-    @Test("A detail opened by another module deletes the issue itself, then closes")
-    func standaloneDetailDeletesItself() async {
-        let (store, issue, issues) = makeStore(reportsToOpener: false)
+    @Test("It deletes the issue itself, then closes")
+    func deletesItself() async {
+        let (store, issue, issues) = makeStore()
         store.exhaustivity = .off
 
         await store.send(.detail(.deleteButtonTapped))
@@ -92,19 +60,45 @@ struct IssuesDetailNavigationTests {
         #expect(issues.wrappedValue[id: issue.id] == nil)
     }
 
-    @Test("The resolver builds the detail from either request, and a not-found screen for unknown ids")
+    @Test("The resolver builds it from an `.open` request, and a not-found screen for unknown ids")
     func resolverBuildsFromRequest() throws {
         try withDependencies {
             $0.defaultFileStorage = .inMemory
         } operation: {
             @Shared(.issues) var issues
             $issues.withLock { $0 = Issue.seed }
-            let issue = issues[0]
-            let list = try Issues.viewController(for: Issues.route(for: Issues.detailRequest(for: issue)))
-            let open = try Issues.viewController(for: Issues.route(for: NavigationRequest(intent: .open(Issues.ref(for: issue)))))
-            #expect(list is UIHostingController<IssuesDetailView>)
+            let context = NavigationContext(navigator: navigator)
+            let open = try Issues.viewController(for: NavigationRequest(intent: .open(Issues.ref(for: issues[0]))), context: context)
+            let unknown = try Issues.viewController(
+                for: NavigationRequest(intent: .open(EntityRef(target: .issues, id: UUID().uuidString, title: ""))),
+                context: context
+            )
             #expect(open is UIHostingController<IssuesDetailView>)
-            #expect(!(Issues.viewController(for: .listDetails(id: UUID().uuidString)) is UIHostingController<IssuesDetailView>))
+            #expect(!(unknown is UIHostingController<IssuesDetailView>))
         }
     }
+
+    @Test("The random-issue request opens a stored issue picked with the random generator, standalone")
+    func randomIssue() throws {
+        let (screen, empty) = try withDependencies {
+            $0.defaultFileStorage = .inMemory
+            $0.withRandomNumberGenerator = WithRandomNumberGenerator(ZeroGenerator())
+        } operation: {
+            @Shared(.issues) var issues
+            $issues.withLock { $0 = Issue.seed }
+            let context = NavigationContext(navigator: navigator)
+            let screen = try Issues.viewController(for: Issues.randomIssueRequest, context: context)
+            $issues.withLock { $0 = [] }
+            return (screen, try Issues.viewController(for: Issues.randomIssueRequest, context: context))
+        }
+        var generator = ZeroGenerator()
+        let expected = Issue.seed.randomElement(using: &generator)
+        #expect((screen as? UIHostingController<IssuesDetailView>)?.rootView.store.issue.id == expected?.id)
+        #expect(!(empty is UIHostingController<IssuesDetailView>))
+    }
+}
+
+/// Always the same numbers, so a random pick is predictable.
+private struct ZeroGenerator: RandomNumberGenerator, Sendable {
+    mutating func next() -> UInt64 { 0 }
 }

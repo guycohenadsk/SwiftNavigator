@@ -1,4 +1,4 @@
-    import ComposableArchitecture
+import ComposableArchitecture
 import SwiftUI
 
 public struct IssuesListView: View {
@@ -16,6 +16,7 @@ public struct IssuesListView: View {
                         .init("Screen B") { store.send(.pushTapped(.screenB)) },
                         .init("Screen C") { store.send(.pushTapped(.screenC)) },
                         .init("Screen D") { store.send(.pushTapped(.screenD)) },
+                        .init("Random issue") { store.send(.randomIssueTapped) },
                     ]),
                     .init(label: "Present", links: [
                         .init("Issues") { store.send(.presentTapped(.issues)) },

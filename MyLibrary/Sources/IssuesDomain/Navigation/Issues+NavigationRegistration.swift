@@ -8,12 +8,12 @@ import UIKit
 extension Issues {
     public static let navigationRegistration = NavigationRegistration(
         target: IssuesNavigationContract.target,
-        // A linked issue (`demoapp://issues/<id>`) opens from the tab's list, so the list applies
-        // its edits and deletion like a tapped row's — not as a standalone detail.
+        // A linked issue (`demoapp://issues/<id>`) opens from the tab's list, as the list's own
+        // child — not as a standalone detail.
         deepLinksToRoot: { request in
             if case .open = request.intent { true } else { false }
         },
-        resolver: { request, _ in try viewController(for: route(for: request)) }
+        resolver: { request, context in try viewController(for: request, context: context) }
     )
 
     /// How other modules, and the navigator's stack, refer to `issue`.
@@ -21,13 +21,17 @@ extension Issues {
         EntityRef(target: .issues, id: issue.id.uuidString, title: issue.rowTitle)
     }
 
-    /// The stack entry of `issue`'s detail as the list pushes it: one of Issues' inner screens, so
-    /// the detail reports to the list instead of saving on its own.
+    /// The stack entry of `issue`'s detail as the list pushes it — one of Issues' inner screens,
+    /// built from the list's store (`viewController(for:context:)`).
     static func detailRequest(for issue: Issue) -> NavigationRequest {
         NavigationRequest(intent: .screen(.issues, name: listDetailsPrefix + issue.id.uuidString))
     }
 
+    /// A random stored issue's detail, opened standalone: `.screen(.issues, name: "random")`.
+    static let randomIssueRequest = NavigationRequest(intent: .screen(.issues, name: randomIssueName))
+
     private static let listDetailsPrefix = "detail/"
+    private static let randomIssueName = "random"
 
     static func route(for request: NavigationRequest) throws -> IssuesNavigationContract.Route {
         guard request.target == IssuesNavigationContract.target else { throw NavigationError.wrongTarget }
@@ -35,6 +39,7 @@ extension Issues {
         case let .open(ref): return .details(id: ref.id)
         case .browse: return .list
         case .selectSingle: return .picker
+        case .screen(_, randomIssueName): return .randomDetails
         case let .screen(_, name) where name.hasPrefix(listDetailsPrefix):
             return .listDetails(id: String(name.dropFirst(listDetailsPrefix.count)))
         case .compose, .perform, .screen: throw NavigationError.unsupportedIntent
@@ -42,28 +47,47 @@ extension Issues {
     }
 
     @MainActor
-    static func viewController(for route: IssuesNavigationContract.Route) -> UIViewController {
-        switch route {
+    static func viewController(for request: NavigationRequest, context: NavigationContext) throws -> UIViewController {
+        switch try route(for: request) {
         case .list:
-            return UIHostingController(rootView: IssuesListView(store: Store(initialState: IssuesList.State()) { IssuesList() }))
+            return IssuesListHostingController(store: Store(initialState: IssuesList.State()) { IssuesList() })
         case .picker:
-            return UIHostingController(rootView: IssuesListView(store: Store(initialState: IssuesList.State(isPicker: true)) { IssuesList() }))
+            return IssuesListHostingController(store: Store(initialState: IssuesList.State(isPicker: true)) { IssuesList() })
         case let .details(id):
-            // Edits go straight to the stored issue; this screen deletes it itself.
+            // Opened by another module (Screen B, C, D, RefPicker): a detail that saves to the
+            // stored issue and deletes it itself.
+            return standaloneDetail(id: id)
+        case .randomDetails:
             @Shared(.issues) var issues
-            guard let uuid = UUID(uuidString: id), let issue = Shared($issues[id: uuid]) else { return issueNotFound() }
-            return detailScreen(IssueDetailScreen.State(issue: issue, reportsToOpener: false))
-        case let .listDetails(id):
-            // A copy: the list applies the edits and the deletion this screen reports.
-            @Shared(.issues) var issues
-            guard let uuid = UUID(uuidString: id), let issue = issues[id: uuid] else { return issueNotFound() }
-            return detailScreen(IssueDetailScreen.State(issue: Shared(value: issue), reportsToOpener: true))
+            @Dependency(\.withRandomNumberGenerator) var withRandomNumberGenerator
+            let stored = issues
+            let issue = withRandomNumberGenerator { stored.randomElement(using: &$0) }
+            return standaloneDetail(id: issue?.id.uuidString ?? "")
+        case .listDetails:
+            // The list that pushed it owns the detail's state: build the detail from the list's store,
+            // scoped to `detail`; leaving sends `.detail(.dismiss)`.
+            guard let list = context.parent as? IssuesListHostingController,
+                  let detail = context.child(
+                      for: request,
+                      of: list.store,
+                      state: \.detail,
+                      action: \.detail,
+                      requestOf: { detailRequest(for: $0.issue) },
+                      content: { UIHostingController(rootView: IssuesDetailView(store: $0)) }
+                  )
+            else {
+                reportIssue("Pushed \(request) from outside the Issues list, or without IssuesList.State.detail showing it.")
+                return UIHostingController(rootView: ContentUnavailableView("Can't open this issue", systemImage: "exclamationmark.triangle"))
+            }
+            return detail
         }
     }
 
     @MainActor
-    private static func detailScreen(_ state: IssueDetailScreen.State) -> UIViewController {
-        let store = Store(initialState: state) { IssueDetailScreen() }
+    private static func standaloneDetail(id: String) -> UIViewController {
+        @Shared(.issues) var issues
+        guard let uuid = UUID(uuidString: id), let issue = Shared($issues[id: uuid]) else { return issueNotFound() }
+        let store = Store(initialState: IssueDetailScreen.State(issue: issue)) { IssueDetailScreen() }
         return UIHostingController(rootView: IssuesDetailView(store: store.scope(state: \.detail, action: \.detail)))
     }
 

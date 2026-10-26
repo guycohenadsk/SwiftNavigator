@@ -3,38 +3,19 @@ import Foundation
 import NavigationCore
 import NavigatorDependency
 
-extension IssuesDetail {
-    /// What the list's detail reports to the list, as `.output` updates while it stays up.
-    @CasePathable
-    public enum Output: Hashable, Sendable {
-        /// The issue as it now reads, after every edit.
-        case edited(Issue)
-        /// The user confirmed deleting the issue; the detail closes itself right after.
-        case deleteRequested(Issue.ID)
-    }
-}
-
-/// Issue details as the navigator builds them from a request, owning their own state.
+/// Issue details as the navigator builds them from an `.open` request, owning their own state.
 ///
-/// Pushed by the Issues list (`Issues.detailRequest(for:)`), it works on a copy and reports every
-/// edit and the delete to the list through `IssuesDetail.Output`; the list applies them. Opened by
-/// another module (Screen B, Screen C, RefPicker) with `.open`, nobody listens for outputs, so it
-/// edits the stored issue and deletes it itself.
+/// Opened by another module (Screen B, C, D, RefPicker), nobody owns the detail, so it edits the
+/// stored issue directly and deletes it itself. The Issues list's own detail is its child instead
+/// (`IssuesList.State.detail`).
 @Reducer
 struct IssueDetailScreen {
     @ObservableState
     struct State: Equatable {
         var detail: IssuesDetail.State
-        /// Whether whoever opened it applies its edits and deletion (the list), rather than it.
-        let reportsToOpener: Bool
-        /// The issue as last reported to the opener. `issue` is a `Shared`, so its old value can't
-        /// be read back after an edit; this is what an edit is compared against.
-        var reportedIssue: Issue
 
-        init(issue: Shared<Issue>, reportsToOpener: Bool) {
+        init(issue: Shared<Issue>) {
             self.detail = IssuesDetail.State(issue: issue)
-            self.reportsToOpener = reportsToOpener
-            self.reportedIssue = issue.wrappedValue
         }
     }
 
@@ -52,23 +33,12 @@ struct IssueDetailScreen {
             switch action {
             case .detail(.delegate(.deleteRequested)):
                 let id = state.detail.issue.id
+                @Shared(.issues) var issues
+                $issues.withLock { _ = $0.remove(id: id) }
                 let navigator = navigator
-                guard state.reportsToOpener else {
-                    @Shared(.issues) var issues
-                    $issues.withLock { _ = $0.remove(id: id) }
-                    return .run { _ in await navigator.complete(with: .dismissed) }
-                }
-                return .run { _ in
-                    await navigator.send(.output(NavigationOutput(IssuesDetail.Output.deleteRequested(id))))
-                    await navigator.complete(with: .dismissed)
-                }
+                return .run { _ in await navigator.complete(with: .dismissed) }
             case .detail:
-                // Any action that changed the issue is reported once, with the issue as it now reads.
-                guard state.reportsToOpener, state.detail.issue != state.reportedIssue else { return .none }
-                let issue = state.detail.issue
-                state.reportedIssue = issue
-                let navigator = navigator
-                return .run { _ in await navigator.send(.output(NavigationOutput(IssuesDetail.Output.edited(issue)))) }
+                return .none
             }
         }
     }

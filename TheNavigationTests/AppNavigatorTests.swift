@@ -352,7 +352,7 @@ struct AppNavigatorCoveredRemovalTests {
 @MainActor
 @Suite("AppNavigator entry leave actions")
 struct AppNavigatorLeaveTests {
-    private let request = NavigationRequest(intent: .screen(.issuesScope, name: "detail/x"))
+    private let request = NavigationRequest(intent: .screen(.issues, name: "detail/x"))
 
     @Test("onLeave runs once for a pop, a complete and a deep-link reset; never for entries still there")
     func onLeaveFiresOnce() {
@@ -395,7 +395,8 @@ struct AppCompositionTests {
         #expect(registry.registeredTargets == Set(NavigationTarget.allCases))
     }
 
-    @Test("Modules' inner screens resolve from their requests")
+    /// The Issues list's own detail needs the list as its parent; IssuesDomainTests cover it.
+    @Test("Modules' screens resolve from their requests")
     func innerScreensResolve() throws {
         let registry = try AppComposition.makeRegistry()
         let stored = Issue(title: "Stored")
@@ -407,7 +408,7 @@ struct AppCompositionTests {
             let navigator = makeNavigator()
             let resolve = { (intent: NavigationIntent) in try? registry.resolve(NavigationRequest(intent: intent), navigator: navigator) }
             return (
-                resolve(.screen(.issues, name: "detail/\(stored.id.uuidString)")),
+                resolve(.open(EntityRef(target: .issues, id: stored.id.uuidString, title: ""))),
                 resolve(.screen(.screenB, name: "b2")),
                 resolve(.screen(.screenB, name: "nope"))
             )

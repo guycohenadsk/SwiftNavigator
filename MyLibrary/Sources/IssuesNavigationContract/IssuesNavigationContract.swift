@@ -9,7 +9,9 @@ public enum IssuesNavigationContract {
         case list
         case picker
         case details(id: String)
-        /// The list's own detail: it reports edits and deletion back to the list as outputs.
+        /// A stored issue picked at random, shown like `.details` of that issue.
+        case randomDetails
+        /// The list's own detail, built from the list's store: the list owns its state.
         case listDetails(id: String)
     }
 }
