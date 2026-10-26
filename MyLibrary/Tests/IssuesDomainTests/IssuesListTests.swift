@@ -81,6 +81,45 @@ struct IssuesListTests {
         #expect(store.state.issues[id: issue.id] == nil)
     }
 
+    @Test("Add appends a draft issue and opens it as the list's child")
+    func addOpensNewIssue() async {
+        let navigator = NavigatorSpy()
+        let store = makeStore(navigator)
+        let new = IssuesDomain.Issue(id: UUID(0), status: .draft, createdAt: Self.now)
+
+        await store.send(.addIssueTapped) {
+            $0.$issues.withLock { $0.append(new) }
+            $0.detail = IssuesDetail.State(issue: Shared(value: new))
+        }
+        await store.finish()
+        #expect(navigator.pushed == [Issues.detailRequest(for: new)])
+    }
+
+    @Test("Swipe-delete removes the rows and pushes nothing")
+    func swipeDeleteRemovesRows() async {
+        let navigator = NavigatorSpy()
+        let store = makeStore(navigator)
+        let removed = [store.state.issues[0].id, store.state.issues[2].id]
+
+        await store.send(.deleteIssues([0, 2])) {
+            $0.$issues.withLock { $0.remove(atOffsets: [0, 2]) }
+        }
+        #expect(removed.allSatisfy { store.state.issues[id: $0] == nil })
+        #expect(navigator.pushed.isEmpty)
+    }
+
+    @Test("The header's Push and Present links browse their target", arguments: NavigationTarget.allCases)
+    func headerLinksBrowse(target: NavigationTarget) async {
+        let navigator = NavigatorSpy()
+        let store = makeStore(navigator)
+
+        await store.send(.pushTapped(target))
+        await store.send(.presentTapped(target))
+        await store.finish()
+        #expect(navigator.pushed == [NavigationRequest(intent: .browse(target))])
+        #expect(navigator.presented == [NavigationRequest(intent: .browse(target))])
+    }
+
     @Test("Random issue pushes the random-issue request and keeps no detail state")
     func randomIssuePushes() async {
         let navigator = NavigatorSpy()

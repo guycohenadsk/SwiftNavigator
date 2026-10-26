@@ -259,6 +259,70 @@ final class NavigationFlowUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Screen B2"].waitForExistence(timeout: 5))
     }
 
+    // MARK: - The Issues list presented as a modal
+
+    /// Present → Issues: the modal's list opens a detail inside the modal (its parent is the modal's
+    /// top screen); back returns to the modal's list, and the modal swipes away. Uses #960, which no
+    /// other test opens.
+    @MainActor
+    func testPresentedListOpensDetailInModal() {
+        presentIssuesList()
+
+        frontmost(app.buttons.containing(NSPredicate(format: "label CONTAINS 'Roof drain blockage'"))).tap()
+        XCTAssertTrue(app.navigationBars["#960"].waitForExistence(timeout: 5))
+        app.navigationBars["#960"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(issuesListBars.element(boundBy: 1).waitForExistence(timeout: 5))
+
+        dismissSheet()
+        XCTAssertEqual(issuesListBars.count, 1)
+    }
+
+    /// Deleting in a detail inside the modal pops back to the modal's list, not the tab's.
+    @MainActor
+    func testDeleteInPresentedListReturnsToModalList() {
+        presentIssuesList()
+        frontmost(app.buttons.matching(identifier: "add_issue_button")).tap()
+        XCTAssertTrue(app.navigationBars["New"].waitForExistence(timeout: 5))
+
+        app.buttons["more_actions_button"].tap()
+        app.buttons["Delete"].tap()
+        app.alerts.buttons["Delete"].tap()
+
+        XCTAssertTrue(issuesListBars.element(boundBy: 1).waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["New"].exists)
+        dismissSheet()
+    }
+
+    /// Random issue works from the modal's header too, and back returns to the modal's list.
+    @MainActor
+    func testRandomIssueInPresentedList() {
+        presentIssuesList()
+        frontmost(app.buttons.matching(NSPredicate(format: "label == 'Random issue'"))).tap()
+        XCTAssertTrue(app.buttons["more_actions_button"].waitForExistence(timeout: 5))
+
+        app.navigationBars.element(boundBy: 0).buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(issuesListBars.element(boundBy: 1).waitForExistence(timeout: 5))
+        dismissSheet()
+    }
+
+    private var issuesListBars: XCUIElementQuery { app.navigationBars.matching(identifier: "Issues") }
+
+    private func presentIssuesList() {
+        inScreenButton("Issues").tap()   // the header's Present link, not the tab
+        XCTAssertTrue(issuesListBars.element(boundBy: 1).waitForExistence(timeout: 5))
+    }
+
+    /// Of the matches, the one lowest on screen: with the modal's list over the tab's, the sheet's copy.
+    private func frontmost(_ query: XCUIElementQuery) -> XCUIElement {
+        query.allElementsBoundByIndex.max { $0.frame.minY < $1.frame.minY } ?? query.firstMatch
+    }
+
+    private func dismissSheet() {
+        let top = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12))
+        top.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
+        XCTAssertTrue(issuesListBars.element(boundBy: 1).waitForNonExistence(timeout: 5))
+    }
+
     // MARK: - Issue detail opened from other screens
 
     /// Random issue (header) pushes a standalone detail of a random stored issue (`.details(id:)`),
@@ -302,6 +366,33 @@ final class NavigationFlowUITests: XCTestCase {
         pick("Fire damper access panel")
 
         editOpenedIssue("#955", title: "Fire damper access panel", backTo: "Screen D")
+    }
+
+    /// A detail opened by another screen deletes the issue itself and returns to that screen.
+    /// Deletes an issue it creates and names itself, so the seed issues stay put.
+    @MainActor
+    func testStandaloneDeleteReturnsToScreenD() {
+        let title = "Delete me \(UUID().uuidString.prefix(4))"
+        app.buttons["add_issue_button"].tap()
+        XCTAssertTrue(app.navigationBars["New"].waitForExistence(timeout: 5))
+        let field = app.descendants(matching: .any)["issue_title_field"]
+        field.tap()
+        field.typeText(title)
+        app.navigationBars.element(boundBy: 0).buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(issuesListBar.waitForExistence(timeout: 5))
+
+        app.tabBars.buttons["Screen D"].tap()
+        app.buttons["Pick an issue, then open it"].tap()
+        pick(title)
+        XCTAssertTrue(app.buttons["more_actions_button"].waitForExistence(timeout: 5))
+        app.buttons["more_actions_button"].tap()
+        app.buttons["Delete"].tap()
+        app.alerts.buttons["Delete"].tap()
+
+        XCTAssertTrue(app.navigationBars["Screen D"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["Issues"].tap()
+        XCTAssertTrue(issuesListBar.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons.containing(NSPredicate(format: "label CONTAINS %@", title)).firstMatch.exists)
     }
 
     private func pick(_ title: String) {

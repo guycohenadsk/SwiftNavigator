@@ -98,6 +98,27 @@ struct IssuesDetailNavigationTests {
     }
 }
 
+/// The detail's own links go through the navigator, wherever the detail was opened from.
+@MainActor
+@Suite("Issue detail links")
+struct IssuesDetailLinksTests {
+    @Test("Screen C is pushed, Screen D is presented as a sheet")
+    func links() async {
+        let navigator = NavigatorSpy()
+        let store = TestStore(initialState: IssuesDetail.State(issue: Shared(value: Issue.seed[0]))) {
+            IssuesDetail()
+        } withDependencies: {
+            $0.navigator = navigator
+        }
+
+        await store.send(.openScreenCTapped)
+        await store.send(.openScreenDAsSheetTapped)
+        await store.finish()
+        #expect(navigator.pushed == [NavigationRequest(intent: .browse(.screenC))])
+        #expect(navigator.presented == [NavigationRequest(intent: .browse(.screenD))])
+    }
+}
+
 /// Always the same numbers, so a random pick is predictable.
 private struct ZeroGenerator: RandomNumberGenerator, Sendable {
     mutating func next() -> UInt64 { 0 }

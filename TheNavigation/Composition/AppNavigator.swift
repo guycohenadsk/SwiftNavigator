@@ -24,6 +24,12 @@ final class StackNavigator {
     /// The UIKit stack bound to `path`, so removals can wait for what covers it.
     @ObservationIgnored weak var controller: UINavigationController?
 
+    #if DEBUG
+    /// For the memory tests: what this stack still holds on to for its entries.
+    var handlerCount: Int { handlers.count }
+    var leaveActionCount: Int { leaveActions.count }
+    #endif
+
     /// Runs `action` once the entry `id` leaves, however it leaves.
     func onLeave(_ id: UUID, _ action: @escaping @MainActor () -> Void) {
         leaveActions[id] = action
@@ -156,6 +162,12 @@ final class AppNavigator: Navigator {
     func pop() { current.pop() }
     func popToRoot() { current.path.removeAll() }
     func dismiss() { _ = modals.popLast() }
+
+    #if DEBUG
+    /// For the memory tests: the deep-link subscriptions and held deep links still around.
+    var rootSubscriberCount: Int { rootSubscribers.count }
+    var pendingRequestCount: Int { pendingRequests.count }
+    #endif
 
     func incomingRequests(for target: NavigationTarget) -> AsyncStream<NavigationRequest> {
         let (stream, continuation) = AsyncStream<NavigationRequest>.makeStream()

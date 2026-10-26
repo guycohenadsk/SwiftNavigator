@@ -3,7 +3,8 @@ import UIKit
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
-    private let navigator = AppNavigator(tabRoots: AppComposition.tabs.map(\.root))
+    /// Internal so the memory tests can drive the running app.
+    let navigator = AppNavigator(tabRoots: AppComposition.tabs.map(\.root))
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }

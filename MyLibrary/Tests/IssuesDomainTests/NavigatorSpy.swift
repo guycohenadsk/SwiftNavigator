@@ -9,13 +9,14 @@ final class NavigatorSpy: Navigator {
     private(set) var sent: [NavigationResult] = []
     private(set) var completed: [NavigationResult] = []
     private(set) var pops = 0
+    private(set) var presented: [NavigationRequest] = []
 
     func push(_ request: NavigationRequest, onResult: NavigationResultHandler?) {
         pushed.append(request)
         if let onResult { pushHandlers.append(onResult) }
     }
 
-    func present(_ request: NavigationRequest, onResult: NavigationResultHandler?) {}
+    func present(_ request: NavigationRequest, onResult: NavigationResultHandler?) { presented.append(request) }
     func send(_ result: NavigationResult) { sent.append(result) }
     func complete(with result: NavigationResult) { completed.append(result) }
     func pop() { pops += 1 }
