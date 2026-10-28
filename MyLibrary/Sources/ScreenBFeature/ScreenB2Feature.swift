@@ -1,5 +1,5 @@
-import AppRoutes
 import ComposableArchitecture
+import NavigationCore
 import NavigatorDependency
 
 @Reducer
@@ -10,7 +10,8 @@ public struct ScreenB2Feature {
     }
 
     public enum Action {
-        case navigateButtonTapped(Route)
+        case openIssuesTapped
+        case openScreenDAsSheetTapped
     }
 
     @Dependency(\.navigator) var navigator
@@ -20,9 +21,12 @@ public struct ScreenB2Feature {
     public var body: some ReducerOf<Self> {
         Reduce { _, action in
             switch action {
-            case let .navigateButtonTapped(route):
+            case .openIssuesTapped:
                 let navigator = navigator
-                return .run { _ in await navigator.push(route) }
+                return .run { _ in await navigator.push(NavigationRequest(intent: .browse(.issues))) }
+            case .openScreenDAsSheetTapped:
+                let navigator = navigator
+                return .run { _ in await navigator.present(NavigationRequest(intent: .browse(.screenD))) }
             }
         }
     }

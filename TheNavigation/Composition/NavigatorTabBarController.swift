@@ -1,6 +1,8 @@
 import UIKit
+import UIKitNavigation
 
-/// Keeps `AppNavigator` aware of which tab's backstack a push/pop should apply to.
+/// Keeps the selected tab and `AppNavigator.tabIndex` in sync, both ways: the user tapping a tab
+/// updates the navigator, and the navigator switching tabs (a deep link) updates the tab bar.
 @MainActor
 final class NavigatorTabBarController: UITabBarController, UITabBarControllerDelegate {
     private let navigator: AppNavigator
@@ -13,6 +15,14 @@ final class NavigatorTabBarController: UITabBarController, UITabBarControllerDel
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        observe { [weak self] in
+            guard let self, selectedIndex != navigator.tabIndex else { return }
+            selectedIndex = navigator.tabIndex
+        }
+    }
 
     func tabBarController(_ tabBarController: UITabBarController, didSelect viewController: UIViewController) {
         navigator.tabIndex = tabBarController.selectedIndex

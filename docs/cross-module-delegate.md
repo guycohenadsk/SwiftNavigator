@@ -3,7 +3,13 @@
 > **Historical note.** This document records how the data-passing design was chosen, and uses the
 > names in play at the time. The `ScreenAFeature` *target* is now `IssuesDomain`; the reducers
 > inside it, `ScreenAFeature` and `ScreenA2Feature`, are now `IssuesList` and `IssuesDetail`; and
-> `Route.screenA` is now `Route.issues`. The decision and the shipped mechanism are unchanged.
+> `Route.screenA` is now `Route.issues`.
+>
+> **Superseded by navigation contracts** ([`navigation-contracts-plan.md`](navigation-contracts-plan.md)).
+> There is no shared `Route` or `ScreenCContext` any more. Results travel the reference's way: the
+> caller passes a handler to `push`/`present`, the screen calls `complete(with:)`, and the navigator
+> keys each handler to its entry's UUID — firing `.dismissed` if the screen leaves without a result.
+> Nothing rides in the request, and pushing the same screen twice is safe.
 
 ## Background: how the app is built today
 

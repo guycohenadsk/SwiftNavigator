@@ -1,4 +1,3 @@
-import AppRoutes
 import ComposableArchitecture
 import SwiftUI
 
@@ -21,12 +20,21 @@ public struct ScreenBView: View {
                     store.send(.pushScreenB2Tapped)
                 }
             }
-            Section("Navigate to") {
-                ForEach(Route.allCases.filter { $0 != .screenB }, id: \.self) { route in
-                    Button(route.title) {
-                        store.send(.navigateButtonTapped(route))
+            Section("Cross-module result") {
+                Button(store.linkedIssue == nil ? "Link an issue" : "Link another issue") {
+                    store.send(.linkIssueTapped)
+                }
+                if let issue = store.linkedIssue {
+                    Button {
+                        store.send(.openLinkedIssueTapped)
+                    } label: {
+                        LabeledContent("Linked", value: issue.title)
                     }
                 }
+            }
+            Section("Navigate to") {
+                Button("Issues") { store.send(.openIssuesTapped) }
+                Button("Screen D") { store.send(.openScreenDTapped) }
             }
         }
         .navigationTitle("Screen B")

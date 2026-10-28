@@ -1,5 +1,5 @@
-import AppRoutes
 import ComposableArchitecture
+import RefPicker
 import SwiftUI
 
 public struct IssuesDetailView: View {
@@ -12,9 +12,10 @@ public struct IssuesDetailView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Detail gets only the push line — present and the Screen C context demo stay on the
-            // list, where Screen A had them.
-            NavigationDemoStrip(onPush: { store.send(.navigateButtonTapped($0)) })
+            NavigationDemoStrip(lines: [
+                .init(label: "Push", links: [.init("Screen C") { store.send(.openScreenCTapped) }]),
+                .init(label: "Present", links: [.init("Screen D") { store.send(.openScreenDAsSheetTapped) }]),
+            ])
 
             Divider()
 
@@ -39,6 +40,13 @@ public struct IssuesDetailView: View {
                             }
                         }
                     }
+
+                    Text("Related issues")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 20)
+                    RefPickerView(store: store.scope(state: \.references, action: \.references))
+                    Divider()
 
                     CreatedByFooter(
                         name: store.issue.createdBy,
