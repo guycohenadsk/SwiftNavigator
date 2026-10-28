@@ -40,16 +40,17 @@ No screen asks UIKit to push or present another module's screen. A screen asks t
 
 ```mermaid
 flowchart LR
-    call["Navigator call<br/><i>push · present · pop · complete · deep link</i>"]
-    state["AppNavigator state<br/><i>tabIndex · tabs[i].path · modals</i>"]
-    ui["UIKit<br/><i>tab bar · NavigationStackController · present(item:)</i>"]
+    navCall["Navigator call<br/><i>push · present · pop · complete · deep link</i>"]
+    navState["AppNavigator state<br/><i>tabIndex · tabs[i].path · modals</i>"]
+    uikit["UIKit<br/><i>tab bar · NavigationStackController · present(item:)</i>"]
+    waiting["Waiting callers"]
 
-    call -->|edits| state
-    state -->|observed by| ui
-    ui -->|"swipe-back, swipe-down, tab tap<br/>write back"| state
-    state -->|"didSet: removed entries<br/>report .dismissed"| results["Waiting callers"]
+    navCall -->|edits| navState
+    navState -->|observed by| uikit
+    uikit -->|"swipe-back, swipe-down, tab tap<br/>write back"| navState
+    navState -->|"didSet: removed entries<br/>report .dismissed"| waiting
 
-    style state fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
+    style navState fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
 ```
 
 The whole navigation hierarchy is three properties:
