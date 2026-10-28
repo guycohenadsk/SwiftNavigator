@@ -3,9 +3,9 @@ import NavigationCore
 import Observation
 import UIKit
 
-/// One back stack — a tab's or a modal's. The same shape as navigation_contract's AppNavigator: a
-/// path, the result handlers of its entries, and a `didSet` that reports `.dismissed` for every
-/// entry that disappears however it disappeared (pop, swipe-back, reset).
+/// One back stack — a tab's or a modal's: a path, the result handlers of its entries, and a `didSet`
+/// that reports `.dismissed` for every entry that disappears however it disappeared (pop,
+/// swipe-back, reset).
 @MainActor
 @Observable
 final class StackNavigator {

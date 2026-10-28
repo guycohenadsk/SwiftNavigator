@@ -6,7 +6,7 @@
 > `Route.screenA` is now `Route.issues`.
 >
 > **Superseded by navigation contracts** ([`navigation-contracts-plan.md`](navigation-contracts-plan.md)).
-> There is no shared `Route` or `ScreenCContext` any more. Results travel the reference's way: the
+> There is no shared `Route` or `ScreenCContext` any more. Results travel with the request: the
 > caller passes a handler to `push`/`present`, the screen calls `complete(with:)`, and the navigator
 > keys each handler to its entry's UUID — firing `.dismissed` if the screen leaves without a result.
 > Nothing rides in the request, and pushing the same screen twice is safe.

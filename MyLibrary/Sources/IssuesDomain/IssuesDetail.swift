@@ -51,7 +51,7 @@ public struct IssuesDetail {
         public var isDescriptionExpanded = false
         public var isLocationDetailsExpanded = false
         @Presents public var alert: AlertState<Action.Alert>?
-        /// Related issues, kept for this visit only — like the reference's `@State` references.
+        /// Related issues, kept for this visit only (not persisted).
         public var references = RefPicker.State(target: .issues)
 
         public init(issue: Shared<Issue>) {
