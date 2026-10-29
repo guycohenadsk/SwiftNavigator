@@ -28,7 +28,7 @@ private final class PushSpy: Navigator {
 @MainActor
 @Suite("Screen B → B2 through the navigator")
 struct ScreenB2NavigationTests {
-    @Test("Pushing B2 pushes a .screen(.screenB, \"b2\") request, and only that")
+    @Test("Pushing B2 pushes the .b2 route, and only that")
     func pushes() async {
         let spy = PushSpy()
         let store = TestStore(initialState: ScreenBFeature.State()) { ScreenBFeature() } withDependencies: {
@@ -38,12 +38,12 @@ struct ScreenB2NavigationTests {
         await store.send(.pushScreenB2Tapped)
         await store.finish()
 
-        #expect(spy.pushed == [NavigationRequest(intent: .screen(.screenB, name: "b2"))])
+        #expect(spy.pushed == [NavigationRequest(ScreenBNavigationContract.Route.b2)])
     }
 
     @Test("Screen B's registration builds B2 from that request")
     func resolvesB2() throws {
-        let controller = try ScreenB.navigationRegistration.resolver(ScreenBNavigationContract.request(for: .b2), NavigationContext(navigator: PushSpy()))
+        let controller = try ScreenB.navigationRegistration.resolver(NavigationRequest(ScreenBNavigationContract.Route.b2), NavigationContext(navigator: PushSpy()))
         #expect(controller is UIHostingController<ScreenB2View>)
     }
 }

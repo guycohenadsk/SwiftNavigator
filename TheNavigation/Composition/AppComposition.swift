@@ -1,10 +1,14 @@
 import ComposableArchitecture
 import IssuesDomain
+import IssuesNavigationContract
 import NavigationCore
 import NavigatorDependency
 import ScreenBFeature
+import ScreenBNavigationContract
 import ScreenCKit
+import ScreenCNavigationContract
 import ScreenDKit
+import ScreenDNavigationContract
 import SwiftUI
 import UIKit
 import UIKitNavigation
@@ -28,10 +32,10 @@ enum AppComposition {
     ]
 
     static let tabs = [
-        TabSpec(root: NavigationRequest(intent: .browse(.issues)), title: "Issues", systemImage: "exclamationmark.bubble"),
-        TabSpec(root: NavigationRequest(intent: .browse(.screenB)), title: "Screen B", systemImage: "b.circle"),
-        TabSpec(root: NavigationRequest(intent: .browse(.screenC)), title: "Screen C", systemImage: "c.circle"),
-        TabSpec(root: NavigationRequest(intent: .browse(.screenD)), title: "Screen D", systemImage: "d.circle"),
+        TabSpec(root: NavigationRequest(IssuesNavigationContract.Route.list), title: "Issues", systemImage: "exclamationmark.bubble"),
+        TabSpec(root: NavigationRequest(ScreenBNavigationContract.Route.home), title: "Screen B", systemImage: "b.circle"),
+        TabSpec(root: NavigationRequest(ScreenCNavigationContract.Route.home), title: "Screen C", systemImage: "c.circle"),
+        TabSpec(root: NavigationRequest(ScreenDNavigationContract.Route.home), title: "Screen D", systemImage: "d.circle"),
     ]
 
     static func makeRegistry() throws -> NavigationRegistry {
@@ -40,19 +44,19 @@ enum AppComposition {
         return registry
     }
 
-    static func makeRootViewController(navigator: AppNavigator) -> UIViewController {
-        let registry: NavigationRegistry
+    /// The registry for the app, or an empty one (and an assertion) if setup fails.
+    static func makeAppRegistry() -> NavigationRegistry {
         do {
-            registry = try makeRegistry()
+            return try makeRegistry()
         } catch {
             assertionFailure("Navigation registry setup failed: \(error)")
-            registry = NavigationRegistry()
+            return NavigationRegistry()
         }
+    }
+
+    static func makeRootViewController(navigator: AppNavigator, registry: NavigationRegistry) -> UIViewController {
         prepareDependencies { $0.navigator = navigator }
-        navigator.deepLinksToRoot = { request in
-            if case .perform = request.intent { return true }
-            return registry.deepLinksToRoot(request)
-        }
+        navigator.deepLinksToRoot = { registry.deepLinksToRoot($0) }
 
         let resolve: (NavigationRequest, NavigationContext) -> UIViewController = { request, context in
             do {

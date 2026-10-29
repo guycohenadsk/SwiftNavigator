@@ -1,21 +1,12 @@
 import NavigationCore
 
-/// Screen B's routes and inner screens. Imported only by Screen B itself.
+/// Screen B's routes. Any feature may import this to navigate to Screen B.
 public enum ScreenBNavigationContract {
-    public static let target: NavigationTarget = .screenB
-
-    public enum Route: Hashable {
+    public enum Route: NavigationRoute {
         case home
+        /// Screen B's inner screen, pushed by Screen B itself.
         case b2
-    }
 
-    /// Screen B's inner screens, pushed by Screen B itself and resolved by its registration.
-    public enum Screen: String {
-        case b2
-    }
-
-    /// The stack entry of one of Screen B's inner screens.
-    public static func request(for screen: Screen) -> NavigationRequest {
-        NavigationRequest(intent: .screen(target, name: screen.rawValue))
+        public static let target: NavigationTarget = .screenB
     }
 }

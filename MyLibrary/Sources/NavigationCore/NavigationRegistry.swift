@@ -1,38 +1,52 @@
+import Foundation
 import UIKit
 
 @MainActor
 public final class NavigationRegistry {
-    private var resolvers: [NavigationTarget: NavigationResolver] = [:]
-    private var deepLinksToRoot: [NavigationTarget: @MainActor @Sendable (NavigationRequest) -> Bool] = [:]
+    private var registrations: [NavigationTarget: NavigationRegistration] = [:]
 
     public init() {}
 
     public func register(_ registration: NavigationRegistration) throws {
-        guard resolvers[registration.target] == nil else {
+        guard registrations[registration.target] == nil else {
             throw NavigationError.duplicateRegistration(registration.target)
         }
-        resolvers[registration.target] = registration.resolver
-        deepLinksToRoot[registration.target] = registration.deepLinksToRoot
+        registrations[registration.target] = registration
     }
 
     /// Whether the module `request` targets wants this deep link handed to its root screen.
     public func deepLinksToRoot(_ request: NavigationRequest) -> Bool {
-        deepLinksToRoot[request.target]?(request) ?? false
+        registrations[request.target]?.deepLinksToRoot(request) ?? false
     }
 
     public var registeredTargets: Set<NavigationTarget> {
-        Set(resolvers.keys)
+        Set(registrations.keys)
     }
 
     public func resolve(_ request: NavigationRequest, context: NavigationContext) throws -> UIViewController {
-        guard let resolver = resolvers[request.target] else {
+        guard let registration = registrations[request.target] else {
             throw NavigationError.unregisteredTarget(request.target)
         }
-        return try resolver(request, context)
+        return try registration.resolver(request, context)
     }
 
     /// Resolves `request` with no parent, as a stack's root.
     public func resolve(_ request: NavigationRequest, navigator: any Navigator) throws -> UIViewController {
         try resolve(request, context: NavigationContext(navigator: navigator))
+    }
+
+    /// `demoapp://<target>/...` → the request the target's registration makes of it. The scheme and
+    /// target are checked here; the rest of the URL is the module's own grammar.
+    public func request(for url: URL) throws -> NavigationRequest {
+        guard url.scheme == "demoapp" else { throw DeepLinkError.unsupportedScheme }
+        guard let host = url.host(), let target = NavigationTarget(rawValue: host) else {
+            throw DeepLinkError.unknownTarget
+        }
+        guard let registration = registrations[target] else { throw NavigationError.unregisteredTarget(target) }
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .reduce(into: [String: String]()) { $0[$1.name] = $1.value ?? "" } ?? [:]
+        let link = DeepLink(target: target, path: url.pathComponents.filter { $0 != "/" }, query: query)
+        guard let request = registration.deepLink(link) else { throw DeepLinkError.unsupportedLink }
+        return request
     }
 }

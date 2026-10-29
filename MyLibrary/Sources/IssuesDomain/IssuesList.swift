@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import IssuesNavigationContract
 import NavigationCore
 import NavigatorDependency
 import ScreenCNavigationContract
@@ -41,13 +42,13 @@ public struct IssuesList {
         case deleteIssues(IndexSet)
         case detail(PresentationAction<IssuesDetail.Action>)
         /// A deep link delivered to the list at the root of the Issues tab: an issue to open
-        /// (`demoapp://issues/<id>`), or an action (`?action=<name>`).
+        /// (`demoapp://issues/<id>`), or Screen C with context (`?action=screenCContext`).
         case incomingRequest(NavigationRequest)
         case issueTapped(Issue.ID)
         case onAppear
-        case presentTapped(NavigationTarget)
+        case presentTapped(NavigationRequest)
         case pushScreenCWithContextTapped
-        case pushTapped(NavigationTarget)
+        case pushTapped(NavigationRequest)
         case randomIssueTapped
         case screenC(ScreenCNavigationContract.Output)
     }
@@ -82,12 +83,12 @@ public struct IssuesList {
                 return .none
 
             case let .incomingRequest(request):
-                switch request.intent {
-                case let .open(ref):
+                switch request.route(as: IssuesNavigationContract.Route.self) {
+                case let .open(rawID):
                     // An unknown or deleted issue leaves the list as it is.
-                    guard let id = UUID(uuidString: ref.id) else { return .none }
+                    guard let id = UUID(uuidString: rawID) else { return .none }
                     return open(id, in: &state)
-                case .perform(_, Issues.screenCContextAction):
+                case .screenCContext:
                     return pushScreenCWithContext()
                 default:
                     return .none
@@ -112,21 +113,21 @@ public struct IssuesList {
                     }
                 }
 
-            case let .presentTapped(target):
+            case let .presentTapped(request):
                 let navigator = navigator
-                return .run { _ in await navigator.present(NavigationRequest(intent: .browse(target))) }
+                return .run { _ in await navigator.present(request) }
 
             case .pushScreenCWithContextTapped:
                 return pushScreenCWithContext()
 
-            case let .pushTapped(target):
+            case let .pushTapped(request):
                 let navigator = navigator
-                return .run { _ in await navigator.push(NavigationRequest(intent: .browse(target))) }
+                return .run { _ in await navigator.push(request) }
 
             case .randomIssueTapped:
                 // Not the list's child: the navigator builds a standalone detail of a random issue.
                 let navigator = navigator
-                return .run { _ in await navigator.push(Issues.randomIssueRequest) }
+                return .run { _ in await navigator.push(NavigationRequest(IssuesNavigationContract.Route.random)) }
 
             case let .screenC(.textSubmitted(text)):
                 state.screenCText = text
@@ -153,7 +154,7 @@ public struct IssuesList {
     private func pushScreenCWithContext() -> Effect<Action> {
         let navigator = navigator
         return .run { send in
-            let request = ScreenCNavigationContract.compose(prompt: "I have been pushed from the issues list")
+            let request = NavigationRequest(ScreenCNavigationContract.Route.compose(prompt: "I have been pushed from the issues list"))
             for await output in await navigator.pushForOutputs(request, as: ScreenCNavigationContract.Output.self) {
                 await send(.screenC(output))
             }
