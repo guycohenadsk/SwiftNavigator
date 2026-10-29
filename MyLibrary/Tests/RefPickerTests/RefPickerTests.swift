@@ -2,6 +2,7 @@ import ComposableArchitecture
 import IssuesNavigationContract
 import NavigationCore
 import NavigatorDependency
+import RFINavigationContract
 import Testing
 import UIKit
 
@@ -38,6 +39,7 @@ private enum OtherRoute: NavigationRoute {
 }
 
 private let pickRequest = NavigationRequest(IssuesNavigationContract.Route.pick)
+private let issueSource = RefPicker.Source(target: .issues, title: "Issue", pick: pickRequest)
 private func entity(_ id: String, _ title: String) -> EntityRef {
     EntityRef(id: id, title: title, open: NavigationRequest(TestRoute.open(id)))
 }
@@ -52,7 +54,7 @@ struct RefPickerTests {
         let spy = NavigatorSpy()
         let item = ReferenceItem(entity("issue-1", "#928"))
         let store = TestStore(initialState: RefPicker.State(references: [item])) {
-            RefPicker()
+            RefPicker(sources: [issueSource])
         } withDependencies: {
             $0.navigator = spy
         }
@@ -68,7 +70,7 @@ struct RefPickerTests {
         let spy = NavigatorSpy()
         spy.result = .selectedEntity(issue)
         let store = TestStore(initialState: RefPicker.State()) {
-            RefPicker()
+            RefPicker(sources: [issueSource])
         } withDependencies: {
             $0.navigator = spy
         }
@@ -78,6 +80,15 @@ struct RefPickerTests {
             $0.references = [ReferenceItem(issue)]
         }
         #expect(spy.pushed == [pickRequest])
+    }
+
+    @Test("The picker offers Issues and RFIs, each through its own contract")
+    func defaultSources() {
+        #expect(RefPicker.sources.map(\.target) == [.issues, .rfi])
+        #expect(RefPicker.sources.map(\.pick) == [
+            NavigationRequest(IssuesNavigationContract.Route.pick),
+            NavigationRequest(RFINavigationContract.Route.pick),
+        ])
     }
 
     @Test("With several sources, Add Reference asks which one, then picks from it")
@@ -127,7 +138,7 @@ struct RefPickerTests {
     func dismissAddsNothing() async {
         let spy = NavigatorSpy()
         let store = TestStore(initialState: RefPicker.State()) {
-            RefPicker()
+            RefPicker(sources: [issueSource])
         } withDependencies: {
             $0.navigator = spy
         }
@@ -140,7 +151,7 @@ struct RefPickerTests {
     func noDuplicates() async {
         let existing = ReferenceItem(issue)
         let store = TestStore(initialState: RefPicker.State(references: [existing])) {
-            RefPicker()
+            RefPicker(sources: [issueSource])
         }
 
         await store.send(.referenceAdded(issue))

@@ -8,7 +8,7 @@
 [![Platform](https://img.shields.io/badge/iOS-17%2B-000000?logo=apple&logoColor=white)](https://developer.apple.com)
 [![TCA](https://img.shields.io/badge/TCA-1.25-6236FF)](https://github.com/pointfreeco/swift-composable-architecture)
 [![swift--navigation](https://img.shields.io/badge/swift--navigation-2.7-6236FF)](https://github.com/pointfreeco/swift-navigation)
-[![UI](https://img.shields.io/badge/SwiftUI%20%2B%20UIKit-hybrid-0A84FF)](#-the-four-tabs)
+[![UI](https://img.shields.io/badge/SwiftUI%20%2B%20UIKit-hybrid-0A84FF)](#-the-five-tabs)
 
 *Features import one shared module, `NavigationCore`, and never each other.*
 
@@ -84,7 +84,7 @@ Screen C is the other way round: a UIKit screen the Issues list keeps no state f
 
 ---
 
-## 🧩 The four tabs
+## 🧩 The five tabs
 
 Each tab's root is a plain request (`NavigationRequest(IssuesNavigationContract.Route.list)`) resolved through the registry—the app shell owns which tabs exist, features own the screens.
 
@@ -94,13 +94,14 @@ Each tab's root is a plain request (`NavigationRequest(IssuesNavigationContract.
 | 🅱️ | **Screen B** (+ in-module **B2**) | SwiftUI + TCA | Presents the Issues picker and receives the pick (`presentForResult`); pushes B2 through the navigator as `ScreenBNavigationContract.Route.b2` |
 | 🅲 | **Screen C** (+ **C2**) | Plain UIKit | Compose mode: Send reports text back to the Issues list's *Context* chip and stays up; also picks an issue, then opens it |
 | 🅳 | **Screen D** (+ **D2**) | Plain UIKit | `complete(with: .dismissed)` closes it, pushed or presented |
+| 📋 | **RFIs** | SwiftUI + TCA | A second module a **RefPicker** can pick from: Add Reference now asks *Issue or RFI*; list, pick, and open by id |
 
 ---
 
 ## ❗ The Issues feature
 
 The Issues tab is the one tab that carries a real domain, so the POC shows its seams under
-something with actual state rather than four buttons.
+something with actual state rather than a few buttons.
 
 | Piece | What it does |
 |-------|--------------|
@@ -149,6 +150,7 @@ flowchart TB
         B["ScreenBFeature"] --- BC1["ScreenBNavigationContract"]
         C["ScreenCKit"] --- CC1["ScreenCNavigationContract"]
         D["ScreenDKit"] --- DC1["ScreenDNavigationContract"]
+        R["RFIDomain"] --- RC1["RFINavigationContract"]
     end
 
     core["🍃 NavigationCore<br/>NavigationTarget · NavigationRoute · NavigationRequest<br/>NavigationResult · Navigator · NavigationRegistry"]
@@ -178,7 +180,7 @@ flowchart TB
 ## 📦 The vocabulary
 
 ```swift
-public enum NavigationTarget: String, CaseIterable { case issues, screenB, screenC, screenD }
+public enum NavigationTarget: String, CaseIterable { case issues, screenB, screenC, screenD, rfi }
 
 public protocol NavigationRoute: Hashable, Sendable { static var target: NavigationTarget { get } }
 
@@ -211,7 +213,7 @@ public protocol Navigator: Sendable {
 //   `pushForResults(_:)`/`presentForResults(_:)` (every result), and `pushForOutputs(_:as:)`/`presentForOutputs(_:as:)` (typed outputs)
 ```
 
-Every module declares its `Route` in its own contract—Issues: `list, pick, open(id:), random, listDetails(id:), screenCContext`; Screen B: `home, b2`; Screen C: `home, compose(prompt:)`; Screen D: `home`. Any feature may import any module's contract to call it, never another feature. A module also routes to itself with its own routes (`listDetails`, `b2`), so its inner screens live in the same navigation state as everything else.
+Every module declares its `Route` in its own contract—Issues: `list, pick, open(id:), random, listDetails(id:), screenCContext`; Screen B: `home, b2`; Screen C: `home, compose(prompt:)`; Screen D: `home`; RFIs: `list, pick, open(id:)`. Any feature may import any module's contract to call it, never another feature. A module also routes to itself with its own routes (`listDetails`, `b2`), so its inner screens live in the same navigation state as everything else.
 
 The caller decides how a screen appears—`push` or `present`—and the target module never needs to change for a new caller. TCA features get the navigator as `@Dependency(\.navigator)`; UIKit screens get it in their initializer.
 
@@ -278,6 +280,13 @@ demoapp://issues/<id>              → .open(id:)         e.g. demoapp://issues/
 demoapp://issues?action=screenCContext → .screenCContext
 ```
 
+RFIs':
+
+```text
+demoapp://rfi                       → .list
+demoapp://rfi/<id>                 → .open(id:)
+```
+
 One fixed landing rule: dismiss modals → switch to the tab whose root is that module (if any) and reset it → push the request (unless that tab's root already is the request). Invalid links are ignored.
 
 Some routes go to the root screen instead of being pushed: whatever a registration's `toRoot` accepts. The root screen gets them through `Navigator.incomingRequests(for:)`:
@@ -312,12 +321,13 @@ SwiftNavigator
 │   ├── Sources/
 │   │   ├── NavigationCore/              # 🍃 the shared vocabulary
 │   │   ├── NavigatorDependency/         #    @Dependency(\.navigator), NavigationContext.child
-│   │   ├── <X>NavigationContract/       #    each module's target, Route, and Output (×4)
+│   │   ├── <X>NavigationContract/       #    each module's target, Route, and Output (×5)
 │   │   ├── RefPicker/                   #    shared reference list + Add Reference
 │   │   ├── IssuesDomain/                # ❗ SwiftUI + TCA, @Shared storage
 │   │   ├── ScreenBFeature/              # 🅱️ SwiftUI + TCA
 │   │   ├── ScreenCKit/                  # 🅲 plain UIKit
-│   │   └── ScreenDKit/                  # 🅳 plain UIKit
+│   │   ├── ScreenDKit/                  # 🅳 plain UIKit
+│   │   └── RFIDomain/                   # 📋 SwiftUI + TCA
 │   └── Tests/
 │       ├── NavigationCoreTests/         #    requests, registry, deep-link parser
 │       ├── RefPickerTests/              #    open, add, dismiss, no duplicates

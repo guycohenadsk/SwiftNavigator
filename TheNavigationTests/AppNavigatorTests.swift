@@ -3,6 +3,7 @@ import Foundation
 import IssuesDomain
 import IssuesNavigationContract
 import NavigationCore
+import RFINavigationContract
 import ScreenBFeature
 import ScreenBNavigationContract
 import ScreenCNavigationContract
@@ -40,6 +41,8 @@ private let screenB = NavigationRequest(ScreenBNavigationContract.Route.home)
 private let screenC = NavigationRequest(ScreenCNavigationContract.Route.home)
 private let screenD = NavigationRequest(ScreenDNavigationContract.Route.home)
 private let openIssue = NavigationRequest(IssuesNavigationContract.Route.open(id: "42"))
+private let rfiList = NavigationRequest(RFINavigationContract.Route.list)
+private let openRFI = NavigationRequest(RFINavigationContract.Route.open(id: "7"))
 private let screenCContext = NavigationRequest(IssuesNavigationContract.Route.screenCContext)
 private let issue = EntityRef(id: "42", title: "#42", open: openIssue)
 
@@ -420,6 +423,24 @@ struct AppCompositionTests {
         #expect(try registry.request(for: #require(URL(string: "demoapp://issues?action=screenCContext"))) == screenCContext)
         #expect(try registry.request(for: #require(URL(string: "demoapp://screenB"))) == screenB)
         #expect(try registry.request(for: #require(URL(string: "demoapp://screenD"))) == screenD)
+        #expect(try registry.request(for: #require(URL(string: "demoapp://rfi"))) == rfiList)
+        #expect(try registry.request(for: #require(URL(string: "demoapp://rfi/7"))) == openRFI)
+    }
+
+    @Test("The app has five tabs, with RFIs last")
+    func fiveTabs() {
+        #expect(AppComposition.tabs.count == 5)
+        #expect(AppComposition.tabs[4].root == rfiList)
+    }
+
+    @Test("An RFI deep link selects the RFIs tab, index 4")
+    func rfiDeepLinkSelectsTab() throws {
+        let registry = try AppComposition.makeRegistry()
+        let navigator = AppNavigator(tabRoots: AppComposition.tabs.map(\.root))
+        navigator.deepLinksToRoot = registry.deepLinksToRoot
+        navigator.open(deepLink: rfiList)
+        #expect(navigator.tabIndex == 4)
+        #expect(navigator.tabs[4].path.isEmpty)
     }
 
     @Test("Every NavigationTarget is registered exactly once")

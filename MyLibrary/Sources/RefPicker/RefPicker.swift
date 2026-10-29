@@ -2,6 +2,7 @@ import ComposableArchitecture
 import IssuesNavigationContract
 import NavigationCore
 import NavigatorDependency
+import RFINavigationContract
 
 /// A list of references, with "Add Reference". Shared by any feature, and hosts implement and pass
 /// nothing: every reference carries the request that opens it, built by the module that owns it,
@@ -22,6 +23,7 @@ public struct RefPicker {
     /// listing its pick route here.
     static let sources = [
         Source(target: .issues, title: "Issue", pick: NavigationRequest(IssuesNavigationContract.Route.pick)),
+        Source(target: .rfi, title: "RFI", pick: NavigationRequest(RFINavigationContract.Route.pick)),
     ]
 
     @ObservableState

@@ -25,10 +25,11 @@ check() { # module, allowed local imports...
 
 check NavigationCore
 check NavigatorDependency NavigationCore
-check RefPicker NavigationCore NavigatorDependency IssuesNavigationContract
+check RefPicker NavigationCore NavigatorDependency IssuesNavigationContract RFINavigationContract
 for contract in *NavigationContract; do check "$contract" NavigationCore; done
-contracts="IssuesNavigationContract ScreenBNavigationContract ScreenCNavigationContract ScreenDNavigationContract"
+contracts="IssuesNavigationContract ScreenBNavigationContract ScreenCNavigationContract ScreenDNavigationContract RFINavigationContract"
 check IssuesDomain   NavigationCore NavigatorDependency RefPicker $contracts
+check RFIDomain      NavigationCore NavigatorDependency RefPicker $contracts
 check ScreenBFeature NavigationCore NavigatorDependency $contracts
 check ScreenCKit     NavigationCore $contracts
 check ScreenDKit     NavigationCore $contracts

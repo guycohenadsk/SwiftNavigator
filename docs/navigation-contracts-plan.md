@@ -29,7 +29,7 @@ endless modals, TCA reducers, and UIKit screens:
 | D8 | **Deep links are module-owned.** `NavigationRegistry.request(for:)` checks scheme and target, then the registration's `deepLink` maps a `DeepLink` (target, path, query) to a `Route` — e.g. `demoapp://issues/<id>` → `.open(id:)`, `?action=screenCContext` → `.screenCContext`. One fixed landing rule — dismiss modals, switch to the module's tab (if any) on a fresh stack, then push the request; or, for routes the registration's `toRoot` accepts, hand the request to that stack's root screen through `Navigator.incomingRequests(for:)` (held until it subscribes). |
 | D9 | **Every tab and every modal is one `StackNavigator`**—an observable path whose `didSet` reports `.dismissed` for whatever leaves. `AppNavigator` routes each call to the current stack. |
 | D10 | **Explicit buttons**, each written out by the screen that shows it — no generated "go anywhere" chips. |
-| D11 | **RefPicker** is a shared component: a list of references with Add Reference, importing NavigationCore and the contracts of the entities it can pick. The host passes nothing (`RefPicker.State()`): the picker lists the modules it can pick from (`sources`, one entry per contract it imports) and asks the user which one when there are several, and every `EntityRef` carries the request that opens it (`open`), built by the module that owns it, so no host implements a route for the picker. Issue details host one for related issues (session-only); Add Reference pushes the picker. It is a small TCA reducer because its host is TCA. |
+| D11 | **RefPicker** is a shared component: a list of references with Add Reference, importing NavigationCore and the contracts of the entities it can pick (Issues and RFIs). The host passes nothing (`RefPicker.State()`): the picker lists the modules it can pick from (`sources`, one entry per contract it imports) and asks the user which one when there are several, and every `EntityRef` carries the request that opens it (`open`), built by the module that owns it, so no host implements a route for the picker. Issue details host one for related issues (session-only); Add Reference pushes the picker. It is a small TCA reducer because its host is TCA. |
 
 ## Module rules (enforced by `Package.swift`, audited by `scripts/check-boundaries.sh`)
 
@@ -86,3 +86,8 @@ are gone, each contract declares its own `Route` enum, and a request boxes one
 `unsupportedIntent` is gone; registrations take `NavigationRegistration(Route.self, deepLink:, toRoot:, resolver:)`
 and each module owns its URL grammar. Any feature may import any contract, never another feature;
 RefPicker no longer knows targets.
+
+**Revision 5** adds a second pickable module, RFIs (`RFIDomain` + `RFINavigationContract`, `NavigationTarget.rfi`,
+a fifth tab). RefPicker lists `sources` for Issues and RFI, so Add Reference asks *Issue or RFI* and each picked
+`EntityRef` opens through its own module's `open(id:)`. Adding it took one enum case, one registration line, one
+tab, and one RefPicker source; no host changed.

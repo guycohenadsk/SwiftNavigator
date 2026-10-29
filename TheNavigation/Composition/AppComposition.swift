@@ -3,6 +3,8 @@ import IssuesDomain
 import IssuesNavigationContract
 import NavigationCore
 import NavigatorDependency
+import RFIDomain
+import RFINavigationContract
 import ScreenBFeature
 import ScreenBNavigationContract
 import ScreenCKit
@@ -29,6 +31,7 @@ enum AppComposition {
         ScreenB.navigationRegistration,
         ScreenC.navigationRegistration,
         ScreenD.navigationRegistration,
+        RFI.navigationRegistration,
     ]
 
     static let tabs = [
@@ -36,6 +39,7 @@ enum AppComposition {
         TabSpec(root: NavigationRequest(ScreenBNavigationContract.Route.home), title: "Screen B", systemImage: "b.circle"),
         TabSpec(root: NavigationRequest(ScreenCNavigationContract.Route.home), title: "Screen C", systemImage: "c.circle"),
         TabSpec(root: NavigationRequest(ScreenDNavigationContract.Route.home), title: "Screen D", systemImage: "d.circle"),
+        TabSpec(root: NavigationRequest(RFINavigationContract.Route.list), title: "RFIs", systemImage: "questionmark.bubble"),
     ]
 
     static func makeRegistry() throws -> NavigationRegistry {
