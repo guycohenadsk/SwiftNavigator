@@ -3,16 +3,12 @@ import ScreenDNavigationContract
 
 extension ScreenD {
     public static let navigationRegistration = NavigationRegistration(
-        target: ScreenDNavigationContract.target,
-        resolver: { request, context in
-            switch try route(for: request) {
+        ScreenDNavigationContract.Route.self,
+        deepLink: { link in link.path.isEmpty && link.query.isEmpty ? .home : nil },
+        resolver: { route, context in
+            switch route {
             case .home: ScreenDViewController(navigator: context.navigator)
             }
         }
     )
-
-    static func route(for request: NavigationRequest) throws -> ScreenDNavigationContract.Route {
-        guard request.target == ScreenDNavigationContract.target else { throw NavigationError.wrongTarget }
-        return .home
-    }
 }

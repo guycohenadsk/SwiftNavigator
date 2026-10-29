@@ -4,9 +4,9 @@
 #
 #   NavigationCore          imports nothing from this package
 #   <X>NavigationContract   imports NavigationCore only
-#   RefPicker               imports NavigationCore, NavigatorDependency (shared component)
-#   feature                 imports NavigationCore, NavigatorDependency, RefPicker, its own contract, and the
-#                           contracts of screens whose outputs it reads — never another feature
+#   RefPicker               imports NavigationCore, NavigatorDependency, and the contracts of the entities it can pick
+#   feature                 imports NavigationCore, NavigatorDependency, RefPicker, and any module's contract
+#                           (to navigate there) — never another feature
 set -euo pipefail
 cd "$(dirname "$0")/../MyLibrary/Sources"
 
@@ -25,12 +25,14 @@ check() { # module, allowed local imports...
 
 check NavigationCore
 check NavigatorDependency NavigationCore
-check RefPicker NavigationCore NavigatorDependency
+check RefPicker NavigationCore NavigatorDependency IssuesNavigationContract RFINavigationContract
 for contract in *NavigationContract; do check "$contract" NavigationCore; done
-check IssuesDomain   NavigationCore NavigatorDependency IssuesNavigationContract ScreenCNavigationContract RefPicker
-check ScreenBFeature NavigationCore NavigatorDependency ScreenBNavigationContract
-check ScreenCKit     NavigationCore ScreenCNavigationContract
-check ScreenDKit     NavigationCore ScreenDNavigationContract
+contracts="IssuesNavigationContract ScreenBNavigationContract ScreenCNavigationContract ScreenDNavigationContract RFINavigationContract"
+check IssuesDomain   NavigationCore NavigatorDependency RefPicker $contracts
+check RFIDomain      NavigationCore NavigatorDependency RefPicker $contracts
+check ScreenBFeature NavigationCore NavigatorDependency $contracts
+check ScreenCKit     NavigationCore $contracts
+check ScreenDKit     NavigationCore $contracts
 
 [ $status -eq 0 ] && echo "✔ Module boundaries clean"
 exit $status

@@ -99,11 +99,9 @@ final class AppNavigator: Navigator {
     @ObservationIgnored private var rootSubscribers: [UUID: RootSubscriber] = [:]
     /// Deep links that landed before their stack's root subscribed.
     @ObservationIgnored private var pendingRequests: [PendingRequest] = []
-    /// Whether a deep link goes to its module's root screen rather than being pushed. `.perform`
-    /// always does; AppComposition adds what each registration declares (`deepLinksToRoot`).
-    @ObservationIgnored var deepLinksToRoot: (NavigationRequest) -> Bool = { request in
-        if case .perform = request.intent { true } else { false }
-    }
+    /// Whether a deep link goes to its module's root screen rather than being pushed. AppComposition
+    /// wires it to what each registration declares (`NavigationRegistry.deepLinksToRoot`).
+    @ObservationIgnored var deepLinksToRoot: (NavigationRequest) -> Bool = { _ in false }
 
     var modals: [ModalNavigator] = [] {
         didSet {
@@ -187,24 +185,24 @@ final class AppNavigator: Navigator {
 
     /// Lands a deep link: dismiss modals, switch to the tab whose root is that module (if any) on a
     /// fresh stack, then push the request — unless that tab's root already is the request, or the
-    /// root screen handles it itself (`.perform`, or `deepLinksToRoot`), in which case it goes to
-    /// that root through `incomingRequests(for:)`.
+    /// root screen handles it itself (`deepLinksToRoot`), in which case it goes to that root through
+    /// `incomingRequests(for:)` — on the current stack when the module has no tab.
     func open(deepLink request: NavigationRequest) {
         modals = []
+        let toRoot = deepLinksToRoot(request)
         if let tab = tabRoots.firstIndex(where: { $0.target == request.target }) {
             tabIndex = tab
             tabs[tab].path = []
             if tabRoots[tab] == request { return }
-            if deepLinksToRoot(request) {
+            if toRoot {
                 deliver(request, on: tabs[tab])
                 return
             }
-        }
-        if case .perform = request.intent {
+        } else if toRoot {
             deliver(request, on: current)
-        } else {
-            push(request)
+            return
         }
+        push(request)
     }
 
     /// Hands `request` to the root screen of `stack` listening for its target, or holds it until one

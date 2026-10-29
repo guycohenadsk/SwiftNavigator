@@ -1,19 +1,25 @@
-public struct NavigationRequest: Hashable, Codable, Sendable {
-    public let intent: NavigationIntent
+/// One module's `Route`, boxed so the navigator, stacks and registry can carry any module's routes
+/// without knowing them. The module reads it back with `route(as:)`.
+public struct NavigationRequest: Hashable, Sendable {
+    public let target: NavigationTarget
+    private let value: any Hashable & Sendable
 
-    /// Derived from the intent, so target and intent can never disagree.
-    public var target: NavigationTarget {
-        switch intent {
-        case let .open(ref): ref.target
-        case let .browse(target): target
-        case let .selectSingle(target): target
-        case let .compose(target, _): target
-        case let .perform(target, _): target
-        case let .screen(target, _): target
-        }
+    public init<Route: NavigationRoute>(_ route: Route) {
+        target = Route.target
+        value = route
     }
 
-    public init(intent: NavigationIntent) {
-        self.intent = intent
+    /// The route, if this request carries a `Route`.
+    public func route<Route: NavigationRoute>(as _: Route.Type = Route.self) -> Route? {
+        value as? Route
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.target == rhs.target && AnyHashable(lhs.value) == AnyHashable(rhs.value)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(target)
+        hasher.combine(AnyHashable(value))
     }
 }

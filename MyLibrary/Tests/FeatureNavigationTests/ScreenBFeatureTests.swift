@@ -1,6 +1,8 @@
 import ComposableArchitecture
 import NavigationCore
+import IssuesNavigationContract
 import NavigatorDependency
+import ScreenDNavigationContract
 import Testing
 
 @testable import ScreenBFeature
@@ -34,7 +36,11 @@ private final class ScreenBNavigatorSpy: Navigator {
 @Suite("Screen B")
 struct ScreenBFeatureTests {
     private let spy = ScreenBNavigatorSpy()
-    private let issue = EntityRef(target: .issues, id: "00000000-0000-0000-0000-000000000002", title: "#931 Plumbing riser leak")
+    private let issue = EntityRef(
+        id: "00000000-0000-0000-0000-000000000002",
+        title: "#931 Plumbing riser leak",
+        open: NavigationRequest(IssuesNavigationContract.Route.open(id: "00000000-0000-0000-0000-000000000002"))
+    )
 
     private func makeStore() -> TestStoreOf<ScreenBFeature> {
         let spy = spy
@@ -49,7 +55,7 @@ struct ScreenBFeatureTests {
 
         await store.send(.linkIssueTapped)
         await spy.waitForPresent()
-        #expect(spy.presented == [NavigationRequest(intent: .selectSingle(.issues))])
+        #expect(spy.presented == [NavigationRequest(IssuesNavigationContract.Route.pick)])
 
         spy.presentHandler?(.selectedEntity(issue))
         await store.receive(\.issueLinked, issue) { $0.linkedIssue = issue }
@@ -74,7 +80,7 @@ struct ScreenBFeatureTests {
         await store.send(.issueLinked(issue)) { $0.linkedIssue = issue }
         await store.send(.openLinkedIssueTapped)
         await store.finish()
-        #expect(spy.pushed == [NavigationRequest(intent: .open(issue))])
+        #expect(spy.pushed == [NavigationRequest(IssuesNavigationContract.Route.open(id: issue.id))])
     }
 
     @Test("Issues and Screen D are pushed by target")
@@ -84,7 +90,7 @@ struct ScreenBFeatureTests {
         await store.send(.openIssuesTapped)
         await store.send(.openScreenDTapped)
         await store.finish()
-        #expect(spy.pushed == [NavigationRequest(intent: .browse(.issues)), NavigationRequest(intent: .browse(.screenD))])
+        #expect(spy.pushed == [NavigationRequest(IssuesNavigationContract.Route.list), NavigationRequest(ScreenDNavigationContract.Route.home)])
     }
 }
 
@@ -101,7 +107,7 @@ struct ScreenB2FeatureTests {
         await store.send(.openIssuesTapped)
         await store.send(.openScreenDAsSheetTapped)
         await store.finish()
-        #expect(spy.pushed == [NavigationRequest(intent: .browse(.issues))])
-        #expect(spy.presented == [NavigationRequest(intent: .browse(.screenD))])
+        #expect(spy.pushed == [NavigationRequest(IssuesNavigationContract.Route.list)])
+        #expect(spy.presented == [NavigationRequest(ScreenDNavigationContract.Route.home)])
     }
 }

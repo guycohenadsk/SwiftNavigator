@@ -3,6 +3,8 @@ import Foundation
 import IssuesNavigationContract
 import NavigationCore
 import ScreenBNavigationContract
+import ScreenCNavigationContract
+import ScreenDNavigationContract
 import SwiftUI
 import Testing
 import UIKit
@@ -15,50 +17,67 @@ import UIKit
 @MainActor
 @Suite("Feature navigation")
 struct FeatureNavigationTests {
-    @Test("Issues maps each intent to its route")
-    func issuesRoutes() throws {
-        let issue = EntityRef(target: .issues, id: "abc", title: "")
-        #expect(try Issues.route(for: NavigationRequest(intent: .browse(.issues))) == .list)
-        #expect(try Issues.route(for: NavigationRequest(intent: .selectSingle(.issues))) == .picker)
-        #expect(try Issues.route(for: NavigationRequest(intent: .open(issue))) == .details(id: "abc"))
-        #expect(try Issues.route(for: NavigationRequest(intent: .screen(.issues, name: "detail/abc"))) == .listDetails(id: "abc"))
-        #expect(try Issues.route(for: NavigationRequest(intent: .screen(.issues, name: "random"))) == .randomDetails)
-        #expect(throws: NavigationError.unsupportedIntent) {
-            try Issues.route(for: NavigationRequest(intent: .screen(.issues, name: "other")))
-        }
+    private func link(_ target: NavigationTarget, path: [String] = [], query: [String: String] = [:]) -> DeepLink {
+        DeepLink(target: target, path: path, query: query)
     }
 
-    @Test("Screen B maps its .b2 inner screen to B2, and other intents to home")
-    func screenBRoutes() throws {
-        #expect(try ScreenB.route(for: NavigationRequest(intent: .browse(.screenB))) == .home)
-        #expect(try ScreenB.route(for: ScreenBNavigationContract.request(for: .b2)) == .b2)
-        #expect(throws: NavigationError.unsupportedIntent) {
-            try ScreenB.route(for: NavigationRequest(intent: .screen(.screenB, name: "b3")))
-        }
+    @Test("Issues declares its deep links: list, one issue, and the Screen C action")
+    func issuesDeepLinks() {
+        let issues = Issues.navigationRegistration
+        #expect(issues.deepLink(link(.issues)) == NavigationRequest(IssuesNavigationContract.Route.list))
+        #expect(issues.deepLink(link(.issues, path: ["abc"])) == NavigationRequest(IssuesNavigationContract.Route.open(id: "abc")))
+        #expect(
+            issues.deepLink(link(.issues, query: ["action": "screenCContext"]))
+                == NavigationRequest(IssuesNavigationContract.Route.screenCContext)
+        )
+        #expect(issues.deepLink(link(.issues, query: ["action": ""])) == nil)
+        #expect(issues.deepLink(link(.issues, query: ["action": "nope"])) == nil)
+    }
+
+    @Test("Issues hands issue links and its action to its root screen, but not the list")
+    func issuesDeepLinksToRoot() {
+        let issues = Issues.navigationRegistration
+        #expect(issues.deepLinksToRoot(NavigationRequest(IssuesNavigationContract.Route.open(id: "abc"))))
+        #expect(issues.deepLinksToRoot(NavigationRequest(IssuesNavigationContract.Route.screenCContext)))
+        #expect(!issues.deepLinksToRoot(NavigationRequest(IssuesNavigationContract.Route.list)))
+    }
+
+    @Test("Screens B, C and D open at home from a bare link, and offer nothing else")
+    func screenDeepLinks() {
+        #expect(ScreenB.navigationRegistration.deepLink(link(.screenB)) == NavigationRequest(ScreenBNavigationContract.Route.home))
+        #expect(ScreenC.navigationRegistration.deepLink(link(.screenC)) == NavigationRequest(ScreenCNavigationContract.Route.home))
+        #expect(ScreenD.navigationRegistration.deepLink(link(.screenD)) == NavigationRequest(ScreenDNavigationContract.Route.home))
+        #expect(ScreenB.navigationRegistration.deepLink(link(.screenB, path: ["b2"])) == nil)
+        #expect(ScreenC.navigationRegistration.deepLink(link(.screenC, query: ["action": "x"])) == nil)
     }
 
     @Test("Every module rejects requests addressed to another module")
     func wrongTarget() {
-        let other = NavigationRequest(intent: .browse(.screenD))
-        #expect(throws: NavigationError.wrongTarget) { try Issues.route(for: other) }
-        #expect(throws: NavigationError.wrongTarget) { try ScreenB.route(for: other) }
-        #expect(throws: NavigationError.wrongTarget) { try ScreenC.route(for: other) }
-        #expect(throws: NavigationError.wrongTarget) { try ScreenD.route(for: NavigationRequest(intent: .browse(.issues))) }
+        let context = NavigationContext(navigator: NavigatorStub())
+        let other = NavigationRequest(ScreenDNavigationContract.Route.home)
+        for registration in [Issues.navigationRegistration, ScreenB.navigationRegistration, ScreenC.navigationRegistration] {
+            #expect(throws: NavigationError.wrongTarget) { try registration.resolver(other, context) }
+        }
+        let issues = NavigationRequest(IssuesNavigationContract.Route.list)
+        #expect(throws: NavigationError.wrongTarget) { try ScreenD.navigationRegistration.resolver(issues, context) }
     }
 
-    @Test("Screen C maps .compose to compose mode and anything else to home")
-    func screenCRoutes() throws {
-        #expect(try ScreenC.route(for: NavigationRequest(intent: .compose(.screenC, prompt: "Hi"))) == .compose(prompt: "Hi"))
-        #expect(try ScreenC.route(for: NavigationRequest(intent: .browse(.screenC))) == .home)
+    @Test("Screen C carries its compose prompt in the route")
+    func screenCCompose() {
+        let request = ScreenCNavigationContract.compose(prompt: "Hi")
+        #expect(request.target == .screenC)
+        #expect(request.route(as: ScreenCNavigationContract.Route.self) == .compose(prompt: "Hi"))
     }
+}
 
-    @Test("Issues does not take text or resolve actions as screens")
-    func issuesRejectsComposeAndPerform() {
-        #expect(throws: NavigationError.unsupportedIntent) {
-            try Issues.route(for: NavigationRequest(intent: .compose(.issues, prompt: "Hi")))
-        }
-        #expect(throws: NavigationError.unsupportedIntent) {
-            try Issues.route(for: NavigationRequest(intent: .perform(.issues, action: "screenCContext")))
-        }
-    }
+@MainActor
+private final class NavigatorStub: Navigator {
+    func push(_ request: NavigationRequest, onResult: NavigationResultHandler?) {}
+    func present(_ request: NavigationRequest, onResult: NavigationResultHandler?) {}
+    func send(_ result: NavigationResult) {}
+    func complete(with result: NavigationResult) {}
+    func pop() {}
+    func popToRoot() {}
+    func dismiss() {}
+    func incomingRequests(for target: NavigationTarget) -> AsyncStream<NavigationRequest> { AsyncStream { $0.finish() } }
 }

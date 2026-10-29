@@ -5,11 +5,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
     /// Internal so the memory tests can drive the running app.
     let navigator = AppNavigator(tabRoots: AppComposition.tabs.map(\.root))
+    private let registry = AppComposition.makeAppRegistry()
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
         let window = UIWindow(windowScene: windowScene)
-        window.rootViewController = AppComposition.makeRootViewController(navigator: navigator)
+        window.rootViewController = AppComposition.makeRootViewController(navigator: navigator, registry: registry)
         window.makeKeyAndVisible()
         self.window = window
         handle(connectionOptions.urlContexts)
@@ -21,7 +22,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     /// Same pipeline as an in-app tap. Invalid links are ignored.
     private func handle(_ contexts: Set<UIOpenURLContext>) {
-        guard let url = contexts.first?.url, let request = try? DeepLinkParser.parse(url) else { return }
+        guard let url = contexts.first?.url, let request = try? registry.request(for: url) else { return }
         navigator.open(deepLink: request)
     }
 }

@@ -13,6 +13,12 @@
 		D1B8F6326B834C0387A64063 /* ScreenBFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 5FBB4D72671948D69F89D377 /* ScreenBFeature */; };
 		E4553DB33E36439DA710F409 /* ScreenCKit in Frameworks */ = {isa = PBXBuildFile; productRef = 2CF94314DEA647D8A5BB9C23 /* ScreenCKit */; };
 		39E635F747C54D30A0E8DD2C /* ScreenDKit in Frameworks */ = {isa = PBXBuildFile; productRef = 46B5E19E605842F0ACE5F725 /* ScreenDKit */; };
+		D5213B725D4E52173619B2D6 /* IssuesNavigationContract in Frameworks */ = {isa = PBXBuildFile; productRef = 313C58B566BE19F9F49A319E /* IssuesNavigationContract */; };
+		90360630A1A098948E2FC736 /* ScreenBNavigationContract in Frameworks */ = {isa = PBXBuildFile; productRef = C5EE30FEEF9801555BC8B571 /* ScreenBNavigationContract */; };
+		DA9D7C0D5514BD963645F249 /* ScreenCNavigationContract in Frameworks */ = {isa = PBXBuildFile; productRef = B3DB225E54675394369E3AEF /* ScreenCNavigationContract */; };
+		6ED65E442FF1DF48BACDD87E /* ScreenDNavigationContract in Frameworks */ = {isa = PBXBuildFile; productRef = 7BE1B4CCAF8B9614A99E2456 /* ScreenDNavigationContract */; };
+		44A5FDF0FAA738E9C1CB2D54 /* RFIDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 6E869663BA63B1D8A2409621 /* RFIDomain */; };
+		2AF0C00E69AD31C1B35D48DE /* RFINavigationContract in Frameworks */ = {isa = PBXBuildFile; productRef = 8FA005C5649CCB6D5A84D08D /* RFINavigationContract */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -80,6 +86,12 @@
 				D1B8F6326B834C0387A64063 /* ScreenBFeature in Frameworks */,
 				E4553DB33E36439DA710F409 /* ScreenCKit in Frameworks */,
 				39E635F747C54D30A0E8DD2C /* ScreenDKit in Frameworks */,
+				D5213B725D4E52173619B2D6 /* IssuesNavigationContract in Frameworks */,
+				90360630A1A098948E2FC736 /* ScreenBNavigationContract in Frameworks */,
+				DA9D7C0D5514BD963645F249 /* ScreenCNavigationContract in Frameworks */,
+				6ED65E442FF1DF48BACDD87E /* ScreenDNavigationContract in Frameworks */,
+				44A5FDF0FAA738E9C1CB2D54 /* RFIDomain in Frameworks */,
+				2AF0C00E69AD31C1B35D48DE /* RFINavigationContract in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -146,6 +158,12 @@
 				5FBB4D72671948D69F89D377 /* ScreenBFeature */,
 				2CF94314DEA647D8A5BB9C23 /* ScreenCKit */,
 				46B5E19E605842F0ACE5F725 /* ScreenDKit */,
+				313C58B566BE19F9F49A319E /* IssuesNavigationContract */,
+				C5EE30FEEF9801555BC8B571 /* ScreenBNavigationContract */,
+				B3DB225E54675394369E3AEF /* ScreenCNavigationContract */,
+				7BE1B4CCAF8B9614A99E2456 /* ScreenDNavigationContract */,
+				6E869663BA63B1D8A2409621 /* RFIDomain */,
+				8FA005C5649CCB6D5A84D08D /* RFINavigationContract */,
 			);
 			productName = TheNavigation;
 			productReference = 017EF7A0304C90E60012BA18 /* TheNavigation.app */;
@@ -651,6 +669,36 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
 			productName = ScreenDKit;
+		};
+		313C58B566BE19F9F49A319E /* IssuesNavigationContract */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
+			productName = IssuesNavigationContract;
+		};
+		C5EE30FEEF9801555BC8B571 /* ScreenBNavigationContract */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
+			productName = ScreenBNavigationContract;
+		};
+		B3DB225E54675394369E3AEF /* ScreenCNavigationContract */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
+			productName = ScreenCNavigationContract;
+		};
+		7BE1B4CCAF8B9614A99E2456 /* ScreenDNavigationContract */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
+			productName = ScreenDNavigationContract;
+		};
+		6E869663BA63B1D8A2409621 /* RFIDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
+			productName = RFIDomain;
+		};
+		8FA005C5649CCB6D5A84D08D /* RFINavigationContract */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 70E786F68F4E879791853EC3 /* XCLocalSwiftPackageReference "MyLibrary" */;
+			productName = RFINavigationContract;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

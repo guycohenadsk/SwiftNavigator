@@ -5,4 +5,5 @@ public enum NavigationTarget: String, Hashable, Codable, Sendable, CaseIterable 
     case screenB
     case screenC
     case screenD
+    case rfi
 }

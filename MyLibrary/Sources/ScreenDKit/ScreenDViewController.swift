@@ -1,4 +1,6 @@
+import IssuesNavigationContract
 import NavigationCore
+import ScreenBNavigationContract
 import UIKit
 
 public final class ScreenDViewController: UIViewController {
@@ -54,16 +56,16 @@ public final class ScreenDViewController: UIViewController {
     private func makeButtons() -> [UIButton] {
         [
             navigationButton("Open Issues") { [navigator] in
-                navigator.push(NavigationRequest(intent: .browse(.issues)))
+                navigator.push(NavigationRequest(IssuesNavigationContract.Route.list))
             },
             navigationButton("Pick an issue, then open it") { [navigator] in
-                navigator.present(NavigationRequest(intent: .selectSingle(.issues))) { result in
+                navigator.present(NavigationRequest(IssuesNavigationContract.Route.pick)) { result in
                     guard case let .selectedEntity(issue) = result else { return }
-                    navigator.push(NavigationRequest(intent: .open(issue)))
+                    navigator.push(NavigationRequest(IssuesNavigationContract.Route.open(id: issue.id)))
                 }
             },
             navigationButton("Open Screen B · sheet") { [navigator] in
-                navigator.present(NavigationRequest(intent: .browse(.screenB)))
+                navigator.present(NavigationRequest(ScreenBNavigationContract.Route.home))
             },
             navigationButton("Close") { [navigator] in
                 // Closes the top screen — this one — whether it was pushed or presented.
