@@ -2,7 +2,7 @@ import ComposableArchitecture
 import SwiftUI
 
 public struct RefPickerView: View {
-    let store: StoreOf<RefPicker>
+    @Bindable var store: StoreOf<RefPicker>
 
     public init(store: StoreOf<RefPicker>) {
         self.store = store
@@ -37,6 +37,7 @@ public struct RefPickerView: View {
                     .font(.system(size: 15, weight: .medium))
                     .padding(.vertical, 12)
             }
+            .confirmationDialog($store.scope(state: \.chooser, action: \.chooser))
         }
     }
 }

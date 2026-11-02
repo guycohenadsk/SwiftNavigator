@@ -8,7 +8,7 @@
 [![Platform](https://img.shields.io/badge/iOS-17%2B-000000?logo=apple&logoColor=white)](https://developer.apple.com)
 [![TCA](https://img.shields.io/badge/TCA-1.25-6236FF)](https://github.com/pointfreeco/swift-composable-architecture)
 [![swift--navigation](https://img.shields.io/badge/swift--navigation-2.7-6236FF)](https://github.com/pointfreeco/swift-navigation)
-[![UI](https://img.shields.io/badge/SwiftUI%20%2B%20UIKit-hybrid-0A84FF)](#-the-four-tabs)
+[![UI](https://img.shields.io/badge/SwiftUI%20%2B%20UIKit-hybrid-0A84FF)](#-the-five-tabs)
 
 *Features import one shared module, `NavigationCore`, and never each other.*
 
@@ -18,13 +18,13 @@
 
 ## 🎯 What this POC proves
 
-Navigation as state, routed by intent. A feature says *what* it wants—`.open(issue)`, `.selectSingle(.issues)`—a registry finds the module that owns it, and the screen appears because a navigation path changed. All of it running in a real hybrid app with **tabs, endless modals, TCA reducers, and plain UIKit screens**.
+Navigation as state, routed by typed routes. A feature says *what* it wants—`IssuesNavigationContract.Route.pick`—a registry finds the module that owns it, and the screen appears because a navigation path changed. All of it running in a real hybrid app with **tabs, endless modals, TCA reducers, and plain UIKit screens**.
 
 | ✅ | Capability |
 |---|---|
 | **State-driven navigation** | Each back stack is an observable `path: [NavigationEntry]`, modals are an observable array, and the selected tab is an index. Every `Navigator` call edits that state, and UIKit follows it (`NavigationStackController`, `present(item:)`); a swipe-back or swipe-down writes back to it. See [Navigation is state](#-navigation-is-state). |
 | **Features never import each other** | Every feature imports `NavigationCore` (plus `NavigatorDependency` for TCA), its own contract, and the contracts of screens whose outputs it reads. Never another feature. |
-| **Semantic intents** | A cross-module request is `.open(EntityRef)`, `.browse(target)`, `.selectSingle(target)`, or `.compose(target, prompt:)`—the same four for every module. Requests are `Codable` values, so a deep link is just another way to write one. |
+| **Typed routes** | Each module's contract declares its own `Route` enum, and a request is `NavigationRequest(Route.pick)`. A module's capabilities are exactly its `Route` cases, so an unsupported request doesn't compile. Each module also owns its URL grammar, so a deep link is just another way to write a route. |
 | **A target registry with module-owned registration** | `NavigationRegistry` maps each `NavigationTarget` to the one module that resolves it. Each feature declares `<X>.navigationRegistration`; the app shell only lists them. No screen switch anywhere. |
 | **Results across modules** | `push`/`present(_:onResult:)` + `send(_:)`/`complete(with:)`. A handler gets any `.output` updates (typed by the sender's contract, e.g. `ScreenCNavigationContract.Output`), then exactly one final result—`.dismissed` included on swipe-back, swipe-down, or deep-link reset. |
 | **Parent-owned child state** | A TCA parent can keep its child screen's state (`@Presents` + `.ifLet`) and still push it through the navigator. Leaving the screen, however it happens, clears that state. |
@@ -84,30 +84,31 @@ Screen C is the other way round: a UIKit screen the Issues list keeps no state f
 
 ---
 
-## 🧩 The four tabs
+## 🧩 The five tabs
 
-Each tab's root is a plain request (`.browse(.issues)`) resolved through the registry—the app shell owns which tabs exist, features own the screens.
+Each tab's root is a plain request (`NavigationRequest(IssuesNavigationContract.Route.list)`) resolved through the registry—the app shell owns which tabs exist, features own the screens.
 
 | Tab | Screen | Built with | Shows off |
 |-----|--------|-----------|-----------|
 | ❗ | **Issues** (+ **Issues detail**) | SwiftUI + TCA | Real domain with `@Shared` storage; doubles as the issue picker; detail state owned by the list; details host a **RefPicker** of related issues |
-| 🅱️ | **Screen B** (+ in-module **B2**) | SwiftUI + TCA | Presents the Issues picker and receives the pick (`presentForResult`); pushes B2 through the navigator as `.screen(.screenB, name: "b2")` |
+| 🅱️ | **Screen B** (+ in-module **B2**) | SwiftUI + TCA | Presents the Issues picker and receives the pick (`presentForResult`); pushes B2 through the navigator as `ScreenBNavigationContract.Route.b2` |
 | 🅲 | **Screen C** (+ **C2**) | Plain UIKit | Compose mode: Send reports text back to the Issues list's *Context* chip and stays up; also picks an issue, then opens it |
 | 🅳 | **Screen D** (+ **D2**) | Plain UIKit | `complete(with: .dismissed)` closes it, pushed or presented |
+| 📋 | **RFIs** | SwiftUI + TCA | A second module a **RefPicker** can pick from: Add Reference now asks *Issue or RFI*; list, pick, and open by id |
 
 ---
 
 ## ❗ The Issues feature
 
 The Issues tab is the one tab that carries a real domain, so the POC shows its seams under
-something with actual state rather than four buttons.
+something with actual state rather than a few buttons.
 
 | Piece | What it does |
 |-------|--------------|
 | `Issue` | A plain `struct`—`Codable`, `Equatable`, `Sendable`. One model for both screens. |
 | `@Shared(.issues)` | `IdentifiedArrayOf<Issue>` persisted to `Documents/issues.json`. The seed data is the key's *default*, so first launch has content with no seeding code. |
-| `IssuesList` | The list, plus a strip of explicit cross-module chips. Creating and deleting write straight to the shared array. Doubles as the **issue picker** other modules open with `.selectSingle(.issues)`. |
-| `IssuesDetail` | From the list: the list's child—its state in `IssuesList.State.detail`, its screen pushed through the navigator as `.screen(.issues, name: "detail/<id>")` (see [Two levels of state](#two-levels-of-state)). From another module: `.open(EntityRef(target: .issues, id:))` builds a standalone detail on the same `@Shared` array, so edits still write through. **Random issue** pushes `.screen(.issues, name: "random")`, a standalone detail of a random stored issue. |
+| `IssuesList` | The list, plus a strip of explicit cross-module chips. Creating and deleting write straight to the shared array. Doubles as the **issue picker** other modules open with `Route.pick`. |
+| `IssuesDetail` | From the list: the list's child—its state in `IssuesList.State.detail`, its screen pushed through the navigator as `Route.listDetails(id:)` (see [Two levels of state](#two-levels-of-state)). From another module: `Route.open(id:)` builds a standalone detail on the same `@Shared` array, so edits still write through. **Random issue** pushes `Route.random`, a standalone detail of a random stored issue. |
 
 The part worth reading the code for is how detail edits get home:
 
@@ -149,9 +150,10 @@ flowchart TB
         B["ScreenBFeature"] --- BC1["ScreenBNavigationContract"]
         C["ScreenCKit"] --- CC1["ScreenCNavigationContract"]
         D["ScreenDKit"] --- DC1["ScreenDNavigationContract"]
+        R["RFIDomain"] --- RC1["RFINavigationContract"]
     end
 
-    core["🍃 NavigationCore<br/>NavigationTarget · NavigationIntent · NavigationRequest<br/>NavigationResult · Navigator · NavigationRegistry · DeepLinkParser"]
+    core["🍃 NavigationCore<br/>NavigationTarget · NavigationRoute · NavigationRequest<br/>NavigationResult · Navigator · NavigationRegistry"]
 
     app --> features
     features --> core
@@ -164,11 +166,11 @@ flowchart TB
 
 | Layer | Owns | Imports |
 |-------|------|---------|
-| **NavigationCore** 🍃 | The shared vocabulary: targets, intents, requests, results, `Navigator`, `NavigationContext`, registry, deep-link parser | Nothing in this package |
+| **NavigationCore** 🍃 | The shared vocabulary: targets, the `NavigationRoute` protocol, requests, results, `Navigator`, `NavigationContext`, registry | Nothing in this package |
 | **NavigatorDependency** | `@Dependency(\.navigator)` and `NavigationContext.child`, for TCA features | `NavigationCore` |
-| **`<X>NavigationContract`** | That module's `target`, its own `Route` enum, and the `Output` values it sends back | `NavigationCore`—imported by module X, and by callers that read X's outputs |
-| **RefPicker** | Shared component: a reference list with **Add Reference**—opens with `.open`, adds by pushing `.selectSingle` (`pushForResult`) | `NavigationCore`, `NavigatorDependency` |
-| **Feature** 🧱 | Screens, `route(for:)`, `<X>.navigationRegistration` | `NavigationCore`, `NavigatorDependency` (TCA), `RefPicker`, its own contract, contracts whose outputs it reads |
+| **`<X>NavigationContract`** | That module's `target`, its own `Route` enum, and the `Output` values it sends back | `NavigationCore`—imported by module X and by any feature that calls it |
+| **RefPicker** | Shared component: a reference list with **Add Reference**—needs nothing from its host; it lists the modules it can pick from (one per contract it imports), asks which when there are several (`pushForResult`), and each picked `EntityRef` carries the request that opens it, built by its owning module, so hosts implement no routes | `NavigationCore`, `NavigatorDependency`, the contracts it picks from |
+| **Feature** 🧱 | Screens, `route(for:)`, `<X>.navigationRegistration` | `NavigationCore`, `NavigatorDependency` (TCA), `RefPicker`, its own contract, any other module's contract |
 | **App target** 📱 | Which modules and tabs exist, `AppNavigator`, URL handling | Everything (and that's its only job) |
 
 **Adding a screen** to a feature touches only that feature. **Adding a module** adds one `NavigationTarget` case in the core and one line in `AppComposition.registrations`—and the composition test fails until the second is done.
@@ -178,15 +180,20 @@ flowchart TB
 ## 📦 The vocabulary
 
 ```swift
-public enum NavigationTarget: String, CaseIterable { case issues, screenB, screenC, screenD }
+public enum NavigationTarget: String, CaseIterable { case issues, screenB, screenC, screenD, rfi }
 
-public enum NavigationIntent: Hashable, Codable {
-    case open(EntityRef)                             // show one entity
-    case browse(NavigationTarget)                    // show the module's main screen
-    case selectSingle(NavigationTarget)              // pick one entity and report it back
-    case compose(NavigationTarget, prompt: String)   // ask for text; replies come as typed .output
-    case screen(NavigationTarget, name: String)      // one of the module's own inner screens
-    case perform(NavigationTarget, action: String)   // run a named action, e.g. from a deep link
+public protocol NavigationRoute: Hashable, Sendable { static var target: NavigationTarget { get } }
+
+public struct NavigationRequest: Hashable {          // one module's Route, boxed
+    public init<Route: NavigationRoute>(_ route: Route)
+    public func route<Route: NavigationRoute>(as: Route.Type = Route.self) -> Route?
+}
+
+// IssuesNavigationContract — the module's capabilities are exactly these cases
+public enum Route: NavigationRoute {
+    case list, pick, random, screenCContext
+    case open(id: String), listDetails(id: String)
+    public static let target: NavigationTarget = .issues
 }
 
 public enum NavigationResult { case selectedEntity(EntityRef), output(NavigationOutput), dismissed }
@@ -206,7 +213,7 @@ public protocol Navigator: Sendable {
 //   `pushForResults(_:)`/`presentForResults(_:)` (every result), and `pushForOutputs(_:as:)`/`presentForOutputs(_:as:)` (typed outputs)
 ```
 
-The first four intents are how modules talk to each other. `.screen` is a module talking to itself—it pushes its own inner screens through the navigator so they live in the same state as everything else—and `.perform` is how a deep link reaches a screen that's already up.
+Every module declares its `Route` in its own contract—Issues: `list, pick, open(id:), random, listDetails(id:), screenCContext`; Screen B: `home, b2`; Screen C: `home, compose(prompt:)`; Screen D: `home`; RFIs: `list, pick, open(id:)`. Any feature may import any module's contract to call it, never another feature. A module also routes to itself with its own routes (`listDetails`, `b2`), so its inner screens live in the same navigation state as everything else.
 
 The caller decides how a screen appears—`push` or `present`—and the target module never needs to change for a new caller. TCA features get the navigator as `@Dependency(\.navigator)`; UIKit screens get it in their initializer.
 
@@ -218,7 +225,7 @@ The caller decides how a screen appears—`push` or `present`—and the target m
 // ScreenBFeature (TCA) — open the Issues picker and wait for the pick
 case .linkIssueTapped:
     return .run { send in
-        let result = await navigator.presentForResult(NavigationRequest(intent: .selectSingle(.issues)))
+        let result = await navigator.presentForResult(NavigationRequest(IssuesNavigationContract.Route.pick))
         if case let .selectedEntity(issue) = result { await send(.issueLinked(issue)) }
     }
 
@@ -226,13 +233,13 @@ case .linkIssueTapped:
 return .run { _ in await navigator.complete(with: .selectedEntity(picked)) }
 
 // ScreenCViewController (UIKit) — same flow with a handler
-navigator.present(NavigationRequest(intent: .selectSingle(.issues))) { result in
+navigator.present(NavigationRequest(IssuesNavigationContract.Route.pick)) { result in
     guard case let .selectedEntity(issue) = result else { return }
-    navigator.push(NavigationRequest(intent: .open(issue)))
+    navigator.push(NavigationRequest(IssuesNavigationContract.Route.open(id: issue.id)))
 }
 ```
 
-Screen B, Screen C, and Issues share nothing but `NavigationCore`.
+Screen B, Screen C, and Issues share nothing but `NavigationCore` and each other's contracts.
 
 ---
 
@@ -265,20 +272,27 @@ Every tab and every modal is the same tiny type—an observable path plus the re
 
 ## 🔗 Deep links
 
-`DeepLinkParser` turns a URL into a `NavigationRequest`:
+`NavigationRegistry.request(for:)` turns a URL into a `NavigationRequest`: it checks the scheme and target, then hands a `DeepLink` (target, path, query) to that module's registration, whose `deepLink` closure maps it to one of its own `Route`s. Each module owns its URL grammar; Issues':
 
 ```text
-demoapp://<target>                 → .browse(target)              e.g. demoapp://screenB
-demoapp://<target>/<id>            → .open(EntityRef(target, id)) e.g. demoapp://issues/00000000-0000-0000-0000-000000000002
-demoapp://<target>?action=<name>   → .perform(target, action:)    e.g. demoapp://issues?action=screenCContext
+demoapp://issues                    → .list
+demoapp://issues/<id>              → .open(id:)         e.g. demoapp://issues/00000000-0000-0000-0000-000000000002
+demoapp://issues?action=screenCContext → .screenCContext
+```
+
+RFIs':
+
+```text
+demoapp://rfi                       → .list
+demoapp://rfi/<id>                 → .open(id:)
 ```
 
 One fixed landing rule: dismiss modals → switch to the tab whose root is that module (if any) and reset it → push the request (unless that tab's root already is the request). Invalid links are ignored.
 
-Some requests go to the root screen instead of being pushed: every `.perform`, and whatever a registration lists in `deepLinksToRoot`. The root screen gets them through `Navigator.incomingRequests(for:)`:
+Some routes go to the root screen instead of being pushed: whatever a registration's `toRoot` accepts. The root screen gets them through `Navigator.incomingRequests(for:)`:
 
 - **Issues** sends `.open` to its list, so a linked issue opens as the list's own child, exactly as a tap would.
-- `screenCContext` becomes a `.deepLinkAction` that runs the same code as the **Push Screen C with context** chip, so Send fills the Issues header just like the in-app flow.
+- `.screenCContext` runs the same code as the **Push Screen C with context** chip, so Send fills the Issues header just like the in-app flow.
 
 A link that arrives before the root subscribes (cold launch) is held until it does.
 
@@ -307,12 +321,13 @@ SwiftNavigator
 │   ├── Sources/
 │   │   ├── NavigationCore/              # 🍃 the shared vocabulary
 │   │   ├── NavigatorDependency/         #    @Dependency(\.navigator), NavigationContext.child
-│   │   ├── <X>NavigationContract/       #    each module's target, Route, and Output (×4)
+│   │   ├── <X>NavigationContract/       #    each module's target, Route, and Output (×5)
 │   │   ├── RefPicker/                   #    shared reference list + Add Reference
 │   │   ├── IssuesDomain/                # ❗ SwiftUI + TCA, @Shared storage
 │   │   ├── ScreenBFeature/              # 🅱️ SwiftUI + TCA
 │   │   ├── ScreenCKit/                  # 🅲 plain UIKit
-│   │   └── ScreenDKit/                  # 🅳 plain UIKit
+│   │   ├── ScreenDKit/                  # 🅳 plain UIKit
+│   │   └── RFIDomain/                   # 📋 SwiftUI + TCA
 │   └── Tests/
 │       ├── NavigationCoreTests/         #    requests, registry, deep-link parser
 │       ├── RefPickerTests/              #    open, add, dismiss, no duplicates
@@ -378,6 +393,6 @@ xcodebuild test -project TheNavigation.xcodeproj -scheme TheNavigation \
 
 <div align="center">
 
-*A proof of concept: navigation as state, screens as strangers, intents as the only shared language.*
+*A proof of concept: navigation as state, screens as strangers, routes as the only shared language.*
 
 </div>

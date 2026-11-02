@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import IssuesNavigationContract
 import NavigationCore
 import NavigatorDependency
 import ScreenCNavigationContract
@@ -53,7 +54,7 @@ struct IssuesPickerTests {
         await store.send(.issueTapped(issue.id))
         await store.finish()
 
-        #expect(spy.results == [.selectedEntity(EntityRef(target: .issues, id: issue.id.uuidString, title: issue.rowTitle))])
+        #expect(spy.results == [.selectedEntity(Issues.ref(for: issue))])
         #expect(spy.pushed.isEmpty)
     }
 }
@@ -83,7 +84,7 @@ struct IssuesScreenCContextTests {
 
         await store.send(.pushScreenCWithContextTapped)
         while spy.pushedHandler == nil { await Task.yield() }
-        #expect(spy.pushed == [ScreenCNavigationContract.compose(prompt: "I have been pushed from the issues list")])
+        #expect(spy.pushed == [NavigationRequest(ScreenCNavigationContract.Route.compose(prompt: "I have been pushed from the issues list"))])
 
         send(.textSubmitted("Hello"), to: spy)
         await store.receive(\.screenC, .textSubmitted("Hello")) { $0.screenCText = "Hello" }
@@ -116,16 +117,16 @@ struct IssuesScreenCContextTests {
         while spy.actionContinuation == nil { await Task.yield() }
         await store.send(.onAppear)   // appearing again does not subscribe twice
 
-        spy.actionContinuation?.yield(NavigationRequest(intent: .perform(.issues, action: Issues.screenCContextAction)))
+        spy.actionContinuation?.yield(NavigationRequest(IssuesNavigationContract.Route.screenCContext))
         await store.receive(\.incomingRequest)
         while spy.pushedHandler == nil { await Task.yield() }
-        #expect(spy.pushed == [ScreenCNavigationContract.compose(prompt: "I have been pushed from the issues list")])
+        #expect(spy.pushed == [NavigationRequest(ScreenCNavigationContract.Route.compose(prompt: "I have been pushed from the issues list"))])
 
         send(.textSubmitted("From a link"), to: spy)
         await store.receive(\.screenC, .textSubmitted("From a link")) { $0.screenCText = "From a link" }
         spy.pushedHandler?(.dismissed)
 
-        spy.actionContinuation?.yield(NavigationRequest(intent: .perform(.issues, action: "unknown")))
+        spy.actionContinuation?.yield(NavigationRequest(IssuesNavigationContract.Route.list))
         await store.receive(\.incomingRequest)
         spy.actionContinuation?.finish()
         await store.finish()
@@ -142,14 +143,14 @@ struct IssuesScreenCContextTests {
         await store.send(.onAppear) { $0.isListeningForDeepLinks = true }
         while spy.actionContinuation == nil { await Task.yield() }
 
-        spy.actionContinuation?.yield(NavigationRequest(intent: .open(EntityRef(target: .issues, id: "not-a-uuid", title: ""))))
+        spy.actionContinuation?.yield(NavigationRequest(IssuesNavigationContract.Route.open(id: "not-a-uuid")))
         await store.receive(\.incomingRequest)
-        spy.actionContinuation?.yield(NavigationRequest(intent: .open(EntityRef(target: .issues, id: UUID().uuidString, title: ""))))
+        spy.actionContinuation?.yield(NavigationRequest(IssuesNavigationContract.Route.open(id: UUID().uuidString)))
         await store.receive(\.incomingRequest)
 
         #expect(spy.pushed.isEmpty)
 
-        spy.actionContinuation?.yield(NavigationRequest(intent: .open(Issues.ref(for: issue))))
+        spy.actionContinuation?.yield(NavigationRequest(IssuesNavigationContract.Route.open(id: issue.id.uuidString)))
         await store.receive(\.incomingRequest) {
             $0.detail = IssuesDetail.State(issue: Shared(value: issue))
         }

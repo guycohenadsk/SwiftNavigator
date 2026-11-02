@@ -1,7 +1,11 @@
 import ComposableArchitecture
 import Foundation
+import IssuesNavigationContract
 import NavigationCore
 import NavigatorDependency
+import ScreenBNavigationContract
+import ScreenCNavigationContract
+import ScreenDNavigationContract
 import SwiftUI
 import Testing
 import UIKit
@@ -38,7 +42,7 @@ struct IssuesListTests {
             $0.detail = IssuesDetail.State(issue: Shared(value: issue))
         }
         await store.finish()
-        #expect(navigator.pushed == [NavigationRequest(intent: .screen(.issues, name: "detail/\(issue.id.uuidString)"))])
+        #expect(navigator.pushed == [NavigationRequest(IssuesNavigationContract.Route.listDetails(id: issue.id.uuidString))])
 
         // Leaving arrives as the child's `.dismiss` (sent by `NavigationContext.child`), handled by `.ifLet`.
         await store.send(.detail(.dismiss)) {
@@ -108,16 +112,21 @@ struct IssuesListTests {
         #expect(navigator.pushed.isEmpty)
     }
 
-    @Test("The header's Push and Present links browse their target", arguments: NavigationTarget.allCases)
-    func headerLinksBrowse(target: NavigationTarget) async {
+    @Test("The header's Push and Present links send their request", arguments: [
+        NavigationRequest(IssuesNavigationContract.Route.list),
+        NavigationRequest(ScreenBNavigationContract.Route.home),
+        NavigationRequest(ScreenCNavigationContract.Route.home),
+        NavigationRequest(ScreenDNavigationContract.Route.home),
+    ])
+    func headerLinks(request: NavigationRequest) async {
         let navigator = NavigatorSpy()
         let store = makeStore(navigator)
 
-        await store.send(.pushTapped(target))
-        await store.send(.presentTapped(target))
+        await store.send(.pushTapped(request))
+        await store.send(.presentTapped(request))
         await store.finish()
-        #expect(navigator.pushed == [NavigationRequest(intent: .browse(target))])
-        #expect(navigator.presented == [NavigationRequest(intent: .browse(target))])
+        #expect(navigator.pushed == [request])
+        #expect(navigator.presented == [request])
     }
 
     @Test("Random issue pushes the random-issue request and keeps no detail state")
@@ -127,7 +136,7 @@ struct IssuesListTests {
 
         await store.send(.randomIssueTapped)
         await store.finish()
-        #expect(navigator.pushed == [Issues.randomIssueRequest])
+        #expect(navigator.pushed == [NavigationRequest(IssuesNavigationContract.Route.random)])
     }
 
     @Test("A deep link opens the issue like a tap; an unknown issue leaves the list alone")
@@ -135,14 +144,41 @@ struct IssuesListTests {
         let navigator = NavigatorSpy()
         let store = makeStore(navigator)
         let issue = store.state.issues[3]
-        await store.send(.incomingRequest(NavigationRequest(intent: .open(EntityRef(target: .issues, id: UUID().uuidString, title: "")))))
-        await store.send(.incomingRequest(NavigationRequest(intent: .open(EntityRef(target: .issues, id: "not-a-uuid", title: "")))))
+        await store.send(.incomingRequest(NavigationRequest(IssuesNavigationContract.Route.open(id: UUID().uuidString))))
+        await store.send(.incomingRequest(NavigationRequest(IssuesNavigationContract.Route.open(id: "not-a-uuid"))))
 
-        await store.send(.incomingRequest(NavigationRequest(intent: .open(Issues.ref(for: issue))))) {
+        await store.send(.incomingRequest(NavigationRequest(IssuesNavigationContract.Route.open(id: issue.id.uuidString)))) {
             $0.detail = IssuesDetail.State(issue: Shared(value: issue))
         }
         await store.finish()
         #expect(navigator.pushed == [Issues.detailRequest(for: issue)])
+    }
+}
+
+/// The Issues deep-link grammar, and which links the list at the tab's root receives.
+@MainActor
+@Suite("Issues deep links")
+struct IssuesDeepLinkTests {
+    private let registration = Issues.navigationRegistration
+
+    private func route(path: [String] = [], query: [String: String] = [:]) -> IssuesNavigationContract.Route? {
+        registration.deepLink(DeepLink(target: .issues, path: path, query: query))?.route(as: IssuesNavigationContract.Route.self)
+    }
+
+    @Test("`issues` is the list, `issues/<id>` the issue, `?action=screenCContext` Screen C; anything else is nil")
+    func grammar() {
+        #expect(route() == .list)
+        #expect(route(path: ["abc"]) == .open(id: "abc"))
+        #expect(route(query: ["action": "screenCContext"]) == .screenCContext)
+        #expect(route(query: ["action": ""]) == nil)
+        #expect(route(query: ["action": "unknown"]) == nil)
+    }
+
+    @Test("Linked issues and the Screen C action go to the root list; the list itself is pushed")
+    func toRoot() {
+        #expect(registration.deepLinksToRoot(NavigationRequest(IssuesNavigationContract.Route.open(id: "abc"))))
+        #expect(registration.deepLinksToRoot(NavigationRequest(IssuesNavigationContract.Route.screenCContext)))
+        #expect(!registration.deepLinksToRoot(NavigationRequest(IssuesNavigationContract.Route.list)))
     }
 }
 
@@ -170,19 +206,19 @@ struct IssuesListResolverTests {
         }
     }
 
-    /// Resolves `request` as if pushed from `parent`.
+    /// Resolves `request` through the Issues registration, as if pushed from `parent`.
     private func resolve(_ request: NavigationRequest, from parent: UIViewController?) throws -> UIViewController {
         let leaves = leaves
-        return try Issues.viewController(
-            for: request,
-            context: NavigationContext(navigator: navigator, parent: parent, onLeave: { leaves.actions.append($0) })
+        return try Issues.navigationRegistration.resolver(
+            request,
+            NavigationContext(navigator: navigator, parent: parent, onLeave: { leaves.actions.append($0) })
         )
     }
 
     @Test("The tab root is the list, and the picker is the list in picker mode")
-    func browseResolvesList() throws {
-        #expect(try resolve(NavigationRequest(intent: .browse(.issues)), from: nil) is IssuesListHostingController)
-        let picker = try #require(try resolve(NavigationRequest(intent: .selectSingle(.issues)), from: nil) as? IssuesListHostingController)
+    func listResolvesList() throws {
+        #expect(try resolve(NavigationRequest(IssuesNavigationContract.Route.list), from: nil) is IssuesListHostingController)
+        let picker = try #require(try resolve(NavigationRequest(IssuesNavigationContract.Route.pick), from: nil) as? IssuesListHostingController)
         #expect(picker.store.isPicker)
     }
 
@@ -250,8 +286,7 @@ struct IssuesListResolverTests {
 
     @Test("`.open` from another module is a detail that saves on its own, not the list's child")
     func openIsStandalone() throws {
-        let ref = EntityRef(target: .issues, id: store.issues[0].id.uuidString, title: "")
-        let screen = try resolve(NavigationRequest(intent: .open(ref)), from: nil)
+        let screen = try resolve(NavigationRequest(IssuesNavigationContract.Route.open(id: store.issues[0].id.uuidString)), from: nil)
         #expect(screen is UIHostingController<IssuesDetailView>)
         #expect(leaves.actions.isEmpty)
     }

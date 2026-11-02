@@ -2,32 +2,69 @@ import Foundation
 import NavigationCore
 import Testing
 
+private enum RouteA: NavigationRoute {
+    static let target = NavigationTarget.issues
+    case list
+    case open(id: String)
+}
+
+private enum RouteB: NavigationRoute {
+    static let target = NavigationTarget.screenB
+    case home
+}
+
+/// Same shape and target as `RouteA`, but another type.
+private enum LookalikeRoute: NavigationRoute {
+    static let target = NavigationTarget.issues
+    case list
+}
+
 @Suite("NavigationRequest")
 struct NavigationRequestTests {
-    @Test("Target is derived from each intent")
-    func targetFromIntent() {
-        #expect(NavigationRequest(intent: .open(EntityRef(target: .issues, id: "1", title: ""))).target == .issues)
-        #expect(NavigationRequest(intent: .browse(.screenB)).target == .screenB)
-        #expect(NavigationRequest(intent: .selectSingle(.screenC)).target == .screenC)
-        #expect(NavigationRequest(intent: .compose(.screenC, prompt: "Hi")).target == .screenC)
-        #expect(NavigationRequest(intent: .screen(.screenB, name: "b2")).target == .screenB)
+    @Test("Target comes from the route's type")
+    func target() {
+        #expect(NavigationRequest(RouteA.open(id: "1")).target == .issues)
+        #expect(NavigationRequest(RouteB.home).target == .screenB)
     }
 
-    @Test(
-        "Requests survive a JSON round-trip",
-        arguments: [
-            NavigationIntent.browse(.issues),
-            .open(EntityRef(target: .issues, id: "1", title: "Issue 1")),
-            .selectSingle(.issues),
-            .compose(.screenC, prompt: "Hi"),
-            .perform(.issues, action: "go"),
-            .screen(.screenB, name: "b2"),
-        ]
-    )
-    func codableRoundTrip(intent: NavigationIntent) throws {
-        let request = NavigationRequest(intent: intent)
-        let decoded = try JSONDecoder().decode(NavigationRequest.self, from: JSONEncoder().encode(request))
-        #expect(decoded == request)
+    @Test("Requests are equal when the route is")
+    func equality() {
+        #expect(NavigationRequest(RouteA.open(id: "1")) == NavigationRequest(RouteA.open(id: "1")))
+        #expect(NavigationRequest(RouteA.open(id: "1")) != NavigationRequest(RouteA.open(id: "2")))
+        #expect(NavigationRequest(RouteA.list) != NavigationRequest(RouteB.home))
+        #expect(NavigationRequest(RouteA.list) != NavigationRequest(LookalikeRoute.list))
+    }
+
+    @Test("Equal requests hash alike")
+    func hashing() {
+        let set: Set = [NavigationRequest(RouteA.open(id: "1")), NavigationRequest(RouteA.open(id: "1")), NavigationRequest(RouteB.home)]
+        #expect(set.count == 2)
+    }
+
+    @Test("The route reads back only as its own type")
+    func routeAs() {
+        let request = NavigationRequest(RouteA.open(id: "1"))
+        #expect(request.route(as: RouteA.self) == .open(id: "1"))
+        #expect(request.route(as: RouteB.self) == nil)
+        #expect(request.route(as: LookalikeRoute.self) == nil)
+    }
+
+    @Test("Round-trips through JSON given the route types")
+    func codableRoundTrip() throws {
+        let requests = [NavigationRequest(RouteA.open(id: "1")), NavigationRequest(RouteA.list), NavigationRequest(RouteB.home)]
+        let data = try JSONEncoder().encode(requests)
+        let decoder = JSONDecoder()
+        decoder.userInfo[.navigationRouteTypes] = [NavigationTarget.issues: RouteA.self, .screenB: RouteB.self] as [NavigationTarget: any NavigationRoute.Type]
+        #expect(try decoder.decode([NavigationRequest].self, from: data) == requests)
+    }
+
+    @Test("Decoding fails without a route type for the target")
+    func decodingNeedsRouteTypes() throws {
+        let data = try JSONEncoder().encode(NavigationRequest(RouteA.list))
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(NavigationRequest.self, from: data) }
+        let decoder = JSONDecoder()
+        decoder.userInfo[.navigationRouteTypes] = [NavigationTarget.screenB: RouteB.self] as [NavigationTarget: any NavigationRoute.Type]
+        #expect(throws: DecodingError.self) { try decoder.decode(NavigationRequest.self, from: data) }
     }
 }
 
@@ -37,7 +74,7 @@ struct NavigationResultTests {
     func finality() {
         #expect(!NavigationResult.output(NavigationOutput("hi")).isFinal)
         #expect(NavigationResult.dismissed.isFinal)
-        #expect(NavigationResult.selectedEntity(EntityRef(target: .issues, id: "1", title: "")).isFinal)
+        #expect(NavigationResult.selectedEntity(EntityRef(id: "1", title: "", open: NavigationRequest(RouteA.list))).isFinal)
     }
 
     @Test("An output reads back only as the type it was sent as")

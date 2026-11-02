@@ -1,4 +1,9 @@
 import ComposableArchitecture
+import IssuesNavigationContract
+import NavigationCore
+import ScreenBNavigationContract
+import ScreenCNavigationContract
+import ScreenDNavigationContract
 import SwiftUI
 
 public struct IssuesListView: View {
@@ -13,16 +18,16 @@ public struct IssuesListView: View {
             if !store.isPicker {
                 NavigationDemoStrip(lines: [
                     .init(label: "Push", links: [
-                        .init("Screen B") { store.send(.pushTapped(.screenB)) },
-                        .init("Screen C") { store.send(.pushTapped(.screenC)) },
-                        .init("Screen D") { store.send(.pushTapped(.screenD)) },
+                        .init("Screen B") { store.send(.pushTapped(NavigationRequest(ScreenBNavigationContract.Route.home))) },
+                        .init("Screen C") { store.send(.pushTapped(NavigationRequest(ScreenCNavigationContract.Route.home))) },
+                        .init("Screen D") { store.send(.pushTapped(NavigationRequest(ScreenDNavigationContract.Route.home))) },
                         .init("Random issue") { store.send(.randomIssueTapped) },
                     ]),
                     .init(label: "Present", links: [
-                        .init("Issues") { store.send(.presentTapped(.issues)) },
-                        .init("Screen B") { store.send(.presentTapped(.screenB)) },
-                        .init("Screen C") { store.send(.presentTapped(.screenC)) },
-                        .init("Screen D") { store.send(.presentTapped(.screenD)) },
+                        .init("Issues") { store.send(.presentTapped(NavigationRequest(IssuesNavigationContract.Route.list))) },
+                        .init("Screen B") { store.send(.presentTapped(NavigationRequest(ScreenBNavigationContract.Route.home))) },
+                        .init("Screen C") { store.send(.presentTapped(NavigationRequest(ScreenCNavigationContract.Route.home))) },
+                        .init("Screen D") { store.send(.presentTapped(NavigationRequest(ScreenDNavigationContract.Route.home))) },
                     ]),
                     .init(label: "Context", links: [
                         .init(

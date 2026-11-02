@@ -6,6 +6,8 @@ import SwiftUI
 import Testing
 import UIKit
 
+import IssuesNavigationContract
+
 @testable import IssuesDomain
 @testable import TheNavigation
 
@@ -64,10 +66,10 @@ struct MemoryTests {
     func deepLinkedDetailReleasedOnReset() async throws {
         let list = try issuesList()
         let ref = Issues.ref(for: list.store.issues[1])
-        await inApp { navigator.open(deepLink: NavigationRequest(intent: .open(ref))) }
+        await inApp { navigator.open(deepLink: NavigationRequest(IssuesNavigationContract.Route.open(id: ref.id))) }
         weak var detail = try await waitForTop(of: issuesStack, UIHostingController<IssuesDetailView>.self)
 
-        await inApp { navigator.open(deepLink: NavigationRequest(intent: .browse(.issues))) }
+        await inApp { navigator.open(deepLink: NavigationRequest(IssuesNavigationContract.Route.list)) }
 
         try await waitUntil { detail == nil }
         #expect(list.store.detail == nil)
@@ -95,8 +97,8 @@ struct MemoryTests {
     func standaloneDetailReleased(random: Bool) async throws {
         let list = try issuesList()
         let request = random
-            ? Issues.randomIssueRequest
-            : NavigationRequest(intent: .open(Issues.ref(for: list.store.issues[2])))
+            ? NavigationRequest(IssuesNavigationContract.Route.random)
+            : NavigationRequest(IssuesNavigationContract.Route.open(id: Issues.ref(for: list.store.issues[2]).id))
         await inApp { navigator.push(request) }
         weak var detail = try await waitForTop(of: issuesStack, UIHostingController<IssuesDetailView>.self)
 
@@ -117,7 +119,7 @@ struct MemoryTests {
         weak var weakDetail: UIViewController?
         weak var weakStack: StackNavigator?
         do {
-            await inApp { navigator.present(NavigationRequest(intent: .browse(.issues))) }
+            await inApp { navigator.present(NavigationRequest(IssuesNavigationContract.Route.list)) }
             let modal = try await waitForModal()
             let modalList = try await waitForTop(of: modal, IssuesListHostingController.self)
             try await waitUntil { self.navigator.rootSubscriberCount == subscribers + 1 }
@@ -151,7 +153,7 @@ struct MemoryTests {
         weak var weakModal: UINavigationController?
         weak var weakPicker: IssuesListHostingController?
         do {
-            await inApp { navigator.present(NavigationRequest(intent: .selectSingle(.issues))) { results.values.append($0) } }
+            await inApp { navigator.present(NavigationRequest(IssuesNavigationContract.Route.pick)) { results.values.append($0) } }
             let modal = try await waitForModal()
             let picker = try await waitForTop(of: modal, IssuesListHostingController.self)
             weakModal = modal

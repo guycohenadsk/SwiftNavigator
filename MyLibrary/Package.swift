@@ -9,9 +9,15 @@ let package = Package(
         .library(name: "NavigatorDependency", targets: ["NavigatorDependency"]),
         .library(name: "RefPicker", targets: ["RefPicker"]),
         .library(name: "IssuesDomain", targets: ["IssuesDomain"]),
+        .library(name: "RFIDomain", targets: ["RFIDomain"]),
         .library(name: "ScreenBFeature", targets: ["ScreenBFeature"]),
         .library(name: "ScreenCKit", targets: ["ScreenCKit"]),
         .library(name: "ScreenDKit", targets: ["ScreenDKit"]),
+        .library(name: "IssuesNavigationContract", targets: ["IssuesNavigationContract"]),
+        .library(name: "ScreenBNavigationContract", targets: ["ScreenBNavigationContract"]),
+        .library(name: "ScreenCNavigationContract", targets: ["ScreenCNavigationContract"]),
+        .library(name: "ScreenDNavigationContract", targets: ["ScreenDNavigationContract"]),
+        .library(name: "RFINavigationContract", targets: ["RFINavigationContract"]),
     ],
     dependencies: [
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.25.3"),
@@ -35,6 +41,8 @@ let package = Package(
             dependencies: [
                 "NavigationCore",
                 "NavigatorDependency",
+                "IssuesNavigationContract",
+                "RFINavigationContract",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]
         ),
@@ -45,6 +53,7 @@ let package = Package(
         .target(name: "ScreenBNavigationContract", dependencies: ["NavigationCore"]),
         .target(name: "ScreenCNavigationContract", dependencies: ["NavigationCore"]),
         .target(name: "ScreenDNavigationContract", dependencies: ["NavigationCore"]),
+        .target(name: "RFINavigationContract", dependencies: ["NavigationCore"]),
 
         .target(
             name: "IssuesDomain",
@@ -52,7 +61,9 @@ let package = Package(
                 "NavigationCore",
                 "NavigatorDependency",
                 "IssuesNavigationContract",
+                "ScreenBNavigationContract",
                 "ScreenCNavigationContract",
+                "ScreenDNavigationContract",
                 "RefPicker",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "UIKitNavigation", package: "swift-navigation"),
@@ -63,13 +74,36 @@ let package = Package(
             dependencies: [
                 "NavigationCore",
                 "NavigatorDependency",
+                "IssuesNavigationContract",
                 "ScreenBNavigationContract",
+                "ScreenCNavigationContract",
+                "ScreenDNavigationContract",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "UIKitNavigation", package: "swift-navigation"),
             ]
         ),
-        .target(name: "ScreenCKit", dependencies: ["NavigationCore", "ScreenCNavigationContract"]),
-        .target(name: "ScreenDKit", dependencies: ["NavigationCore", "ScreenDNavigationContract"]),
+        .target(name: "ScreenCKit", dependencies: [
+            "NavigationCore", "IssuesNavigationContract", "ScreenBNavigationContract", "ScreenCNavigationContract",
+        ]),
+        .target(name: "ScreenDKit", dependencies: [
+            "NavigationCore", "IssuesNavigationContract", "ScreenBNavigationContract", "ScreenDNavigationContract",
+        ]),
+
+        .target(
+            name: "RFIDomain",
+            dependencies: [
+                "NavigationCore",
+                "NavigatorDependency",
+                "RFINavigationContract",
+                "IssuesNavigationContract",
+                "ScreenBNavigationContract",
+                "ScreenCNavigationContract",
+                "ScreenDNavigationContract",
+                "RefPicker",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "UIKitNavigation", package: "swift-navigation"),
+            ]
+        ),
 
         .testTarget(name: "NavigationCoreTests", dependencies: ["NavigationCore"]),
         .testTarget(
@@ -78,6 +112,8 @@ let package = Package(
                 "RefPicker",
                 "NavigationCore",
                 "NavigatorDependency",
+                "IssuesNavigationContract",
+                "RFINavigationContract",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]
         ),
@@ -90,6 +126,8 @@ let package = Package(
                 "NavigatorDependency",
                 "ScreenBFeature",
                 "ScreenBNavigationContract",
+                "ScreenCNavigationContract",
+                "ScreenDNavigationContract",
                 "ScreenCKit",
                 "ScreenDKit",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
@@ -100,7 +138,20 @@ let package = Package(
             dependencies: [
                 "IssuesDomain",
                 "NavigationCore",
+                "IssuesNavigationContract",
+                "ScreenBNavigationContract",
                 "ScreenCNavigationContract",
+                "ScreenDNavigationContract",
+                "NavigatorDependency",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ]
+        ),
+        .testTarget(
+            name: "RFIDomainTests",
+            dependencies: [
+                "RFIDomain",
+                "NavigationCore",
+                "RFINavigationContract",
                 "NavigatorDependency",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]

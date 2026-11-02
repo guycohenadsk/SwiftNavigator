@@ -1,7 +1,10 @@
 import ComposableArchitecture
 import Foundation
+import IssuesNavigationContract
 import NavigationCore
 import NavigatorDependency
+import ScreenCNavigationContract
+import ScreenDNavigationContract
 import SwiftUI
 import Testing
 import UIKit
@@ -60,36 +63,33 @@ struct IssuesDetailNavigationTests {
         #expect(issues.wrappedValue[id: issue.id] == nil)
     }
 
-    @Test("The resolver builds it from an `.open` request, and a not-found screen for unknown ids")
-    func resolverBuildsFromRequest() throws {
-        try withDependencies {
+    @Test("The resolver builds it from `.open`, and a not-found screen for unknown ids")
+    func resolverBuildsFromRequest() {
+        withDependencies {
             $0.defaultFileStorage = .inMemory
         } operation: {
             @Shared(.issues) var issues
             $issues.withLock { $0 = Issue.seed }
             let context = NavigationContext(navigator: navigator)
-            let open = try Issues.viewController(for: NavigationRequest(intent: .open(Issues.ref(for: issues[0]))), context: context)
-            let unknown = try Issues.viewController(
-                for: NavigationRequest(intent: .open(EntityRef(target: .issues, id: UUID().uuidString, title: ""))),
-                context: context
-            )
+            let open = Issues.viewController(for: .open(id: issues[0].id.uuidString), context: context)
+            let unknown = Issues.viewController(for: .open(id: UUID().uuidString), context: context)
             #expect(open is UIHostingController<IssuesDetailView>)
             #expect(!(unknown is UIHostingController<IssuesDetailView>))
         }
     }
 
-    @Test("The random-issue request opens a stored issue picked with the random generator, standalone")
-    func randomIssue() throws {
-        let (screen, empty) = try withDependencies {
+    @Test("`.random` opens a stored issue picked with the random generator, standalone")
+    func randomIssue() {
+        let (screen, empty) = withDependencies {
             $0.defaultFileStorage = .inMemory
             $0.withRandomNumberGenerator = WithRandomNumberGenerator(ZeroGenerator())
         } operation: {
             @Shared(.issues) var issues
             $issues.withLock { $0 = Issue.seed }
             let context = NavigationContext(navigator: navigator)
-            let screen = try Issues.viewController(for: Issues.randomIssueRequest, context: context)
+            let screen = Issues.viewController(for: .random, context: context)
             $issues.withLock { $0 = [] }
-            return (screen, try Issues.viewController(for: Issues.randomIssueRequest, context: context))
+            return (screen, Issues.viewController(for: .random, context: context))
         }
         var generator = ZeroGenerator()
         let expected = Issue.seed.randomElement(using: &generator)
@@ -114,8 +114,8 @@ struct IssuesDetailLinksTests {
         await store.send(.openScreenCTapped)
         await store.send(.openScreenDAsSheetTapped)
         await store.finish()
-        #expect(navigator.pushed == [NavigationRequest(intent: .browse(.screenC))])
-        #expect(navigator.presented == [NavigationRequest(intent: .browse(.screenD))])
+        #expect(navigator.pushed == [NavigationRequest(ScreenCNavigationContract.Route.home)])
+        #expect(navigator.presented == [NavigationRequest(ScreenDNavigationContract.Route.home)])
     }
 }
 

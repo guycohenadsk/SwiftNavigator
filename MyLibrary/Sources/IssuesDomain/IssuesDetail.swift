@@ -1,8 +1,11 @@
 import ComposableArchitecture
 import Foundation
+import IssuesNavigationContract
 import NavigationCore
 import NavigatorDependency
 import RefPicker
+import ScreenCNavigationContract
+import ScreenDNavigationContract
 
 @Reducer
 public struct IssuesDetail {
@@ -52,7 +55,7 @@ public struct IssuesDetail {
         public var isLocationDetailsExpanded = false
         @Presents public var alert: AlertState<Action.Alert>?
         /// Related issues, kept for this visit only (not persisted).
-        public var references = RefPicker.State(target: .issues)
+        public var references = RefPicker.State()
 
         public init(issue: Shared<Issue>) {
             self._issue = issue
@@ -139,11 +142,11 @@ public struct IssuesDetail {
             switch action {
             case .openScreenCTapped:
                 let navigator = navigator
-                return .run { _ in await navigator.push(NavigationRequest(intent: .browse(.screenC))) }
+                return .run { _ in await navigator.push(NavigationRequest(ScreenCNavigationContract.Route.home)) }
 
             case .openScreenDAsSheetTapped:
                 let navigator = navigator
-                return .run { _ in await navigator.present(NavigationRequest(intent: .browse(.screenD))) }
+                return .run { _ in await navigator.present(NavigationRequest(ScreenDNavigationContract.Route.home)) }
 
             case let .titleChanged(title):
                 state.$issue.withLock { $0.title = title }

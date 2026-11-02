@@ -5,7 +5,7 @@
 ## Goal
 
 Replace the central screen catalog (`Route`, `Destination`, `ScreenCContext` in `AppRoutes`) and
-the per-screen switch (`ScreenResolver`) with distributed navigation contracts—semantic intents, a
+the per-screen switch (`ScreenResolver`) with distributed navigation contracts—typed routes, a
 target registry, module-owned registrations—over state-driven stacks, fitted to this app's tabs,
 endless modals, TCA reducers, and UIKit screens:
 
@@ -19,17 +19,17 @@ endless modals, TCA reducers, and UIKit screens:
 
 | # | Decision |
 |---|----------|
-| D1 | **Semantic intents only.** Cross-module navigation is `.open(EntityRef)`, `.browse(target)`, `.selectSingle(target)`, plus `.compose(target, prompt:)` for asking a module for text. No typed per-feature factories, no payloads. |
+| D1 | **Typed routes, declared in contracts.** Each module's contract declares a `Route` enum conforming to `NavigationRoute`; a request is `NavigationRequest(Route.pick)`, read back with `request.route(as:)`. A module's capabilities are exactly its cases, so unsupported requests don't compile. The core holds no intent vocabulary. |
 | D2 | **`NavigationTarget` is an enum in `NavigationCore`.** One case per module; adding a module is the one shared edit, and a test fails until it is registered. |
 | D3 | **Contracts hold a module's own `target`, `Route`, and the `Output` values it sends back.** The module imports its contract to send; callers import it to read those outputs — never the module's implementation. |
 | D4 | **Each feature owns its registration:** `extension <X> { static let navigationRegistration }` in `<X>+NavigationRegistration.swift`. The app shell lists them; no global self-registration. |
 | D5 | **The caller chooses the presentation** by calling `push` or `present`. Targets declare nothing about presentation. |
 | D6 | **Results: `push`/`present(_:onResult:)` + `send(_:)` / `complete(with:)`.** A handler gets any `.output(NavigationOutput)` updates (sent while the screen stays up, typed by the sender's contract), then exactly one final result — `.selectedEntity(EntityRef)` or `.dismissed`. `complete(with: .output)` delivers the output, then leaves with `.dismissed`. `pushForOutputs(_:as:)` / `presentForOutputs(_:as:)` stream just the typed outputs, so a TCA effect turns each into an action. `.dismissed` also fires on swipe-back, swipe-down, and deep-link resets, so `pushForResult(s)(_:)` / `presentForResult(s)(_:)` (async; final result or a stream of all) are safe to await from a TCA effect. |
 | D7 | **Tabs use the same requests:** each tab root is a `NavigationRequest` resolved through the registry. The app shell owns which tabs exist. |
-| D8 | **Deep links:** `demoapp://<target>` → `.browse`, `demoapp://<target>/<id>` → `.open`, and `?action=<name>` → `.perform(target, action:)`. One fixed landing rule — dismiss modals, switch to the module's tab (if any) on a fresh stack, then push the request; or, for `.perform` and whatever a registration lists in `deepLinksToRoot`, hand the request to that stack's root screen through `Navigator.incomingRequests(for:)` (held until it subscribes). |
+| D8 | **Deep links are module-owned.** `NavigationRegistry.request(for:)` checks scheme and target, then the registration's `deepLink` maps a `DeepLink` (target, path, query) to a `Route` — e.g. `demoapp://issues/<id>` → `.open(id:)`, `?action=screenCContext` → `.screenCContext`. One fixed landing rule — dismiss modals, switch to the module's tab (if any) on a fresh stack, then push the request; or, for routes the registration's `toRoot` accepts, hand the request to that stack's root screen through `Navigator.incomingRequests(for:)` (held until it subscribes). |
 | D9 | **Every tab and every modal is one `StackNavigator`**—an observable path whose `didSet` reports `.dismissed` for whatever leaves. `AppNavigator` routes each call to the current stack. |
 | D10 | **Explicit buttons**, each written out by the screen that shows it — no generated "go anywhere" chips. |
-| D11 | **RefPicker** is a shared component: a list of references with Add Reference, knowing only NavigationCore. Issue details host one for related issues (session-only); Add Reference pushes the picker. It is a small TCA reducer because its host is TCA. |
+| D11 | **RefPicker** is a shared component: a list of references with Add Reference, importing NavigationCore and the contracts of the entities it can pick (Issues and RFIs). The host passes nothing (`RefPicker.State()`): the picker lists the modules it can pick from (`sources`, one entry per contract it imports) and asks the user which one when there are several, and every `EntityRef` carries the request that opens it (`open`), built by the module that owns it, so no host implements a route for the picker. Issue details host one for related issues (session-only); Add Reference pushes the picker. It is a small TCA reducer because its host is TCA. |
 
 ## Module rules (enforced by `Package.swift`, audited by `scripts/check-boundaries.sh`)
 
@@ -38,7 +38,7 @@ NavigationCore              → (nothing in this package)
 <X>NavigationContract       → NavigationCore
 RefPicker                   → NavigationCore, NavigatorDependency
 feature X                   → NavigationCore, NavigatorDependency (TCA), RefPicker, <X>NavigationContract,
-                              contracts of screens whose outputs X reads
+                              any other module's contract
 App target                  → everything (composition root only)
 ```
 
@@ -79,3 +79,15 @@ chip's flow, so Screen C's replies land in that same list.
   route links to that app. A project-specific scheme would avoid it.
 - **State restoration** — `NavigationRequest` is `Codable`, so the stacks could be persisted later.
 - **Codegen of the registration list**, so adding a module needs no hand-written line in `AppComposition`.
+
+**Revision 4** moves intents from the core into the contracts: `NavigationIntent` and `DeepLinkParser`
+are gone, each contract declares its own `Route` enum, and a request boxes one
+(`NavigationRequest(IssuesNavigationContract.Route.pick)`). Capabilities are exactly the cases, so
+`unsupportedIntent` is gone; registrations take `NavigationRegistration(Route.self, deepLink:, toRoot:, resolver:)`
+and each module owns its URL grammar. Any feature may import any contract, never another feature;
+RefPicker no longer knows targets.
+
+**Revision 5** adds a second pickable module, RFIs (`RFIDomain` + `RFINavigationContract`, `NavigationTarget.rfi`,
+a fifth tab). RefPicker lists `sources` for Issues and RFI, so Add Reference asks *Issue or RFI* and each picked
+`EntityRef` opens through its own module's `open(id:)`. Adding it took one enum case, one registration line, one
+tab, and one RefPicker source; no host changed.

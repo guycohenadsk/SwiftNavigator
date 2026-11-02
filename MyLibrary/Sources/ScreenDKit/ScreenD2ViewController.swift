@@ -1,4 +1,6 @@
+import IssuesNavigationContract
 import NavigationCore
+import ScreenBNavigationContract
 import UIKit
 
 public final class ScreenD2ViewController: UIViewController {
@@ -39,10 +41,10 @@ public final class ScreenD2ViewController: UIViewController {
     private func makeButtons() -> [UIButton] {
         [
             navigationButton("Open Issues") { [navigator] in
-                navigator.push(NavigationRequest(intent: .browse(.issues)))
+                navigator.push(NavigationRequest(IssuesNavigationContract.Route.list))
             },
             navigationButton("Open Screen B") { [navigator] in
-                navigator.push(NavigationRequest(intent: .browse(.screenB)))
+                navigator.push(NavigationRequest(ScreenBNavigationContract.Route.home))
             },
         ]
     }
