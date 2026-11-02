@@ -1,3 +1,4 @@
+import Foundation
 import NavigationCore
 import Testing
 import UIKit
@@ -54,6 +55,17 @@ struct NavigationRegistryTests {
         #expect(try registry.resolve(NavigationRequest(BRoute.b2), navigator: InertNavigator()).title == "b2")
         #expect(try registry.resolve(NavigationRequest(IssueRoute.list), navigator: InertNavigator()).title == "issues")
         #expect(registry.registeredTargets == [.issues, .screenB])
+    }
+
+    @Test("Its route types decode the requests of its modules")
+    func routeTypesDecode() throws {
+        let registry = NavigationRegistry()
+        try registry.register(issuesRegistration())
+        try registry.register(bRegistration())
+        let requests = [NavigationRequest(IssueRoute.list), NavigationRequest(BRoute.b2)]
+        let decoder = JSONDecoder()
+        decoder.userInfo[.navigationRouteTypes] = registry.routeTypes
+        #expect(try decoder.decode([NavigationRequest].self, from: JSONEncoder().encode(requests)) == requests)
     }
 
     @Test("A request of another route type for the same target is wrongTarget")

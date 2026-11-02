@@ -19,6 +19,11 @@ public final class NavigationRegistry {
         registrations[request.target]?.deepLinksToRoot(request) ?? false
     }
 
+    /// For `userInfo[.navigationRouteTypes]` when decoding requests.
+    public var routeTypes: [NavigationTarget: any NavigationRoute.Type] {
+        registrations.mapValues(\.routeType)
+    }
+
     public var registeredTargets: Set<NavigationTarget> {
         Set(registrations.keys)
     }
