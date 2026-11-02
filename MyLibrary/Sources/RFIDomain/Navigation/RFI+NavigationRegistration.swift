@@ -8,6 +8,7 @@ import UIKit
 extension RFI {
     public static let navigationRegistration = NavigationRegistration(
         RFINavigationContract.Route.self,
+        pick: (title: "RFI", route: .pick),
         deepLink: { link in
             switch (link.path.first, link.query["action"]) {
             case (nil, nil): .list

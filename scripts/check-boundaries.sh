@@ -4,7 +4,7 @@
 #
 #   NavigationCore          imports nothing from this package
 #   <X>NavigationContract   imports NavigationCore only
-#   RefPicker               imports NavigationCore, NavigatorDependency, and the contracts of the entities it can pick
+#   RefPicker               imports NavigationCore, NavigatorDependency (shared component)
 #   feature                 imports NavigationCore, NavigatorDependency, RefPicker, and any module's contract
 #                           (to navigate there) — never another feature
 set -euo pipefail
@@ -25,7 +25,7 @@ check() { # module, allowed local imports...
 
 check NavigationCore
 check NavigatorDependency NavigationCore
-check RefPicker NavigationCore NavigatorDependency IssuesNavigationContract RFINavigationContract
+check RefPicker NavigationCore NavigatorDependency
 for contract in *NavigationContract; do check "$contract" NavigationCore; done
 contracts="IssuesNavigationContract ScreenBNavigationContract ScreenCNavigationContract ScreenDNavigationContract RFINavigationContract"
 check IssuesDomain   NavigationCore NavigatorDependency RefPicker $contracts

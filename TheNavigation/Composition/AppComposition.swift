@@ -59,7 +59,10 @@ enum AppComposition {
     }
 
     static func makeRootViewController(navigator: AppNavigator, registry: NavigationRegistry) -> UIViewController {
-        prepareDependencies { $0.navigator = navigator }
+        prepareDependencies {
+            $0.navigator = navigator
+            $0.navigationPickers = registry.pickers
+        }
         navigator.deepLinksToRoot = { registry.deepLinksToRoot($0) }
 
         let resolve: (NavigationRequest, NavigationContext) -> UIViewController = { request, context in

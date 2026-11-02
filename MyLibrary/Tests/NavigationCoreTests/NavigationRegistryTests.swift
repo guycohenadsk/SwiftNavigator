@@ -57,6 +57,23 @@ struct NavigationRegistryTests {
         #expect(registry.registeredTargets == [.issues, .screenB])
     }
 
+    @Test("Collects the pickers modules offer, in registration order")
+    func pickers() throws {
+        enum PickRoute: NavigationRoute {
+            static let target = NavigationTarget.rfi
+            case pick
+        }
+        let registry = NavigationRegistry()
+        try registry.register(NavigationRegistration(PickRoute.self, pick: (title: "RFI", route: .pick)) { _, _ in UIViewController() })
+        try registry.register(bRegistration())   // offers none
+        try registry.register(NavigationRegistration(IssueRoute.self, pick: (title: "Issue", route: .list)) { _, _ in UIViewController() })
+
+        #expect(registry.pickers == [
+            NavigationPicker(title: "RFI", route: PickRoute.pick),
+            NavigationPicker(title: "Issue", route: IssueRoute.list),
+        ])
+    }
+
     @Test("Its route types decode the requests of its modules")
     func routeTypesDecode() throws {
         let registry = NavigationRegistry()

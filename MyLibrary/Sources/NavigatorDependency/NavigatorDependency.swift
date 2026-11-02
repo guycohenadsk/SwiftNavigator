@@ -9,6 +9,20 @@ extension DependencyValues {
     }
 }
 
+extension DependencyValues {
+    /// The pickers the registered modules offer (`NavigationRegistry.pickers`), installed by
+    /// AppComposition. Empty until then.
+    public var navigationPickers: [NavigationPicker] {
+        get { self[NavigationPickersKey.self] }
+        set { self[NavigationPickersKey.self] = newValue }
+    }
+}
+
+private enum NavigationPickersKey: DependencyKey {
+    static let liveValue: [NavigationPicker] = []
+    static let testValue: [NavigationPicker] = []
+}
+
 private enum NavigatorKey: DependencyKey {
     static let liveValue: any Navigator = UnimplementedNavigator()
     static let testValue: any Navigator = UnimplementedNavigator()

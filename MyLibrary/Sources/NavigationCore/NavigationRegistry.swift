@@ -4,6 +4,8 @@ import UIKit
 @MainActor
 public final class NavigationRegistry {
     private var registrations: [NavigationTarget: NavigationRegistration] = [:]
+    /// Targets in the order they were registered.
+    private var order: [NavigationTarget] = []
 
     public init() {}
 
@@ -12,6 +14,7 @@ public final class NavigationRegistry {
             throw NavigationError.duplicateRegistration(registration.target)
         }
         registrations[registration.target] = registration
+        order.append(registration.target)
     }
 
     /// Whether the module `request` targets wants this deep link handed to its root screen.
@@ -22,6 +25,11 @@ public final class NavigationRegistry {
     /// For `userInfo[.navigationRouteTypes]` when decoding requests.
     public var routeTypes: [NavigationTarget: any NavigationRoute.Type] {
         registrations.mapValues(\.routeType)
+    }
+
+    /// Every registered module's picker, in registration order.
+    public var pickers: [NavigationPicker] {
+        order.compactMap { registrations[$0]?.picker }
     }
 
     public var registeredTargets: Set<NavigationTarget> {
