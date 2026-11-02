@@ -21,6 +21,8 @@ public struct DeepLink: Hashable, Sendable {
 /// resolver. Each feature owns one as a plain value; the app shell only lists them.
 public struct NavigationRegistration: Sendable {
     public let target: NavigationTarget
+    /// The module's `Route` type, so its requests can be decoded.
+    public let routeType: any NavigationRoute.Type
     public let resolver: NavigationResolver
     /// Turns a deep link into one of the module's routes, or `nil` if the module doesn't offer it.
     public let deepLink: @Sendable (DeepLink) -> NavigationRequest?
@@ -39,6 +41,7 @@ public struct NavigationRegistration: Sendable {
         resolver: @escaping @MainActor @Sendable (Route, NavigationContext) throws -> UIViewController
     ) {
         target = Route.target
+        routeType = Route.self
         self.deepLink = { link in deepLink(link).map { NavigationRequest($0) } }
         deepLinksToRoot = { request in request.route(as: Route.self).map(toRoot) ?? false }
         self.resolver = { request, context in

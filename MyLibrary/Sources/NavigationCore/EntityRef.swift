@@ -2,7 +2,7 @@
 /// without the caller importing that module's model types. The owning module says how to open it
 /// (`open`), so anyone holding the reference, such as a shared component, can open it without
 /// knowing the module's routes.
-public struct EntityRef: Hashable, Sendable {
+public struct EntityRef: Hashable, Sendable, Codable {
     public let id: String
     public let title: String
     /// The request that opens this entity, built by the module that owns it.

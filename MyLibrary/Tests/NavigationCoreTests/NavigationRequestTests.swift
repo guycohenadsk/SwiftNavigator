@@ -48,6 +48,24 @@ struct NavigationRequestTests {
         #expect(request.route(as: RouteB.self) == nil)
         #expect(request.route(as: LookalikeRoute.self) == nil)
     }
+
+    @Test("Round-trips through JSON given the route types")
+    func codableRoundTrip() throws {
+        let requests = [NavigationRequest(RouteA.open(id: "1")), NavigationRequest(RouteA.list), NavigationRequest(RouteB.home)]
+        let data = try JSONEncoder().encode(requests)
+        let decoder = JSONDecoder()
+        decoder.userInfo[.navigationRouteTypes] = [NavigationTarget.issues: RouteA.self, .screenB: RouteB.self] as [NavigationTarget: any NavigationRoute.Type]
+        #expect(try decoder.decode([NavigationRequest].self, from: data) == requests)
+    }
+
+    @Test("Decoding fails without a route type for the target")
+    func decodingNeedsRouteTypes() throws {
+        let data = try JSONEncoder().encode(NavigationRequest(RouteA.list))
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(NavigationRequest.self, from: data) }
+        let decoder = JSONDecoder()
+        decoder.userInfo[.navigationRouteTypes] = [NavigationTarget.screenB: RouteB.self] as [NavigationTarget: any NavigationRoute.Type]
+        #expect(throws: DecodingError.self) { try decoder.decode(NavigationRequest.self, from: data) }
+    }
 }
 
 @Suite("NavigationResult")

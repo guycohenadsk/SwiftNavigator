@@ -108,16 +108,14 @@ final class NavigationFlowUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Link another issue"].exists)
     }
 
-    /// Issue details hosts the RefPicker: Add Reference presents the Issues picker, and the pick
-    /// shows up under "Related issues".
+    /// Issue details hosts the RefPicker: Add Reference asks which module to pick from, Issue pushes
+    /// the Issues picker, and the pick shows up under "Related issues".
     @MainActor
     func testAddReferenceToIssue() {
         app.buttons.containing(NSPredicate(format: "label CONTAINS 'Commissioning'")).firstMatch.tap()
         XCTAssertTrue(app.navigationBars["#928"].waitForExistence(timeout: 5))
 
-        let add = app.buttons["Add Reference"]
-        for _ in 0..<4 where !add.isHittable { app.swipeUp() }
-        add.tap()
+        addReference(from: "Issue")
 
         XCTAssertTrue(app.navigationBars["Pick an issue"].waitForExistence(timeout: 5))
         app.buttons.containing(NSPredicate(format: "label CONTAINS 'Plumbing riser leak'")).firstMatch.tap()
@@ -416,6 +414,125 @@ final class NavigationFlowUITests: XCTestCase {
         app.tabBars.buttons["Issues"].tap()
         XCTAssertTrue(issuesListBar.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS %@", suffix)).firstMatch.waitForExistence(timeout: 5))
+    }
+
+    // MARK: - RFI module
+
+    private var rfiListBar: XCUIElement { app.navigationBars["RFIs"] }
+
+    private func rfiRow(_ subject: String) -> XCUIElement {
+        app.buttons.containing(NSPredicate(format: "label CONTAINS %@", subject)).firstMatch
+    }
+
+    /// The RFIs tab lists the seed RFIs; a row pushes its detail, and back returns to the list.
+    @MainActor
+    func testRFITabOpensDetailThenBack() {
+        app.tabBars.buttons["RFIs"].tap()
+        XCTAssertTrue(rfiListBar.waitForExistence(timeout: 5))
+
+        rfiRow("Slab thickness at grid C-4").tap()
+        XCTAssertTrue(app.navigationBars["RFI-012"].waitForExistence(timeout: 5))
+
+        app.navigationBars["RFI-012"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(rfiListBar.waitForExistence(timeout: 5))
+    }
+
+    /// `demoapp://rfi` from another tab selects the RFIs tab.
+    @MainActor
+    func testDeepLinkOpensRFIList() throws {
+        app.tabBars.buttons["Screen B"].tap()
+
+        app.open(try XCTUnwrap(URL(string: "demoapp://rfi")))
+        confirmOpenInAppIfAsked()
+
+        XCTAssertTrue(rfiListBar.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["RFIs"].isSelected)
+    }
+
+    /// `demoapp://rfi/<id>` from another tab selects the RFIs tab and pushes the RFI on its list;
+    /// back lands on that list.
+    @MainActor
+    func testDeepLinkOpensRFI() throws {
+        app.tabBars.buttons["Screen D"].tap()
+
+        app.open(try XCTUnwrap(URL(string: "demoapp://rfi/00000000-0000-0000-0000-000000009002")))
+        confirmOpenInAppIfAsked()
+
+        XCTAssertTrue(app.navigationBars["RFI-013"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["RFIs"].isSelected)
+
+        app.navigationBars["RFI-013"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(rfiListBar.waitForExistence(timeout: 5))
+    }
+
+    // MARK: - Ref Picker with two sources
+
+    /// Add Reference, at the bottom of a detail.
+    private func addReference(from source: String) {
+        let add = app.buttons["Add Reference"]
+        for _ in 0..<4 where !add.isHittable { app.swipeUp() }
+        add.tap()
+        let choice = app.buttons[source]
+        XCTAssertTrue(choice.waitForExistence(timeout: 5))
+        choice.tap()
+    }
+
+    /// Dismissing the source dialog — a popover with no Cancel button, so a tap outside it — pushes
+    /// no picker and adds nothing.
+    @MainActor
+    func testCancellingReferenceChooserAddsNothing() {
+        openCommissioningIssue()
+
+        let add = app.buttons["Add Reference"]
+        for _ in 0..<4 where !add.isHittable { app.swipeUp() }
+        add.tap()
+        XCTAssertTrue(app.buttons["RFI"].waitForExistence(timeout: 5))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)).tap()
+
+        XCTAssertTrue(app.buttons["RFI"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["#928"].exists)
+        XCTAssertFalse(app.navigationBars["Pick an RFI"].exists)
+        XCTAssertFalse(app.navigationBars["Pick an issue"].exists)
+    }
+
+    /// An issue references an RFI: RFI pushes the RFI picker, the pick shows under the issue, and
+    /// tapping it opens the RFI from the reference alone — on the Issues tab — and back returns to
+    /// the issue.
+    @MainActor
+    func testIssueReferencesRFIThenOpensIt() {
+        openCommissioningIssue()
+
+        addReference(from: "RFI")
+        XCTAssertTrue(app.navigationBars["Pick an RFI"].waitForExistence(timeout: 5))
+        rfiRow("Duct clash above ceiling").tap()
+
+        XCTAssertTrue(app.navigationBars["#928"].waitForExistence(timeout: 5))
+        let reference = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Duct clash above ceiling'")).firstMatch
+        XCTAssertTrue(reference.waitForExistence(timeout: 5))
+
+        for _ in 0..<4 where !reference.isHittable { app.swipeUp() }
+        reference.tap()
+        XCTAssertTrue(app.navigationBars["RFI-014"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Issues"].isSelected)
+
+        app.navigationBars["RFI-014"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["#928"].waitForExistence(timeout: 5))
+    }
+
+    /// An RFI hosts the same Ref Picker: Issue pushes the Issues picker on the RFIs tab, and the pick
+    /// shows under "Related".
+    @MainActor
+    func testRFIReferencesIssue() {
+        app.tabBars.buttons["RFIs"].tap()
+        rfiRow("Fire rating of corridor doors").tap()
+        XCTAssertTrue(app.navigationBars["RFI-013"].waitForExistence(timeout: 5))
+
+        addReference(from: "Issue")
+        pick("Plumbing riser leak")
+
+        XCTAssertTrue(app.navigationBars["RFI-013"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS 'Plumbing riser leak'")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["RFIs"].isSelected)
     }
 
     /// The first time a URL targets the app, iOS may ask for confirmation in SpringBoard.
