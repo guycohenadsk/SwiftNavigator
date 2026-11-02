@@ -8,6 +8,7 @@ import UIKit
 extension Issues {
     public static let navigationRegistration = NavigationRegistration(
         IssuesNavigationContract.Route.self,
+        pick: (title: "Issue", route: .pick),
         deepLink: { link in
             switch (link.path.first, link.query["action"]) {
             case (nil, nil): .list

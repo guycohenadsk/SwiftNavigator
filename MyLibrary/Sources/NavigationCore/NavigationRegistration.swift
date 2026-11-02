@@ -24,6 +24,8 @@ public struct NavigationRegistration: Sendable {
     /// The module's `Route` type, so its requests can be decoded.
     public let routeType: any NavigationRoute.Type
     public let resolver: NavigationResolver
+    /// How to pick one of the module's entities, if it offers that.
+    public let picker: NavigationPicker?
     /// Turns a deep link into one of the module's routes, or `nil` if the module doesn't offer it.
     public let deepLink: @Sendable (DeepLink) -> NavigationRequest?
     /// Deep-link requests to hand to the module's root screen (`Navigator.incomingRequests(for:)`)
@@ -31,17 +33,20 @@ public struct NavigationRegistration: Sendable {
     public let deepLinksToRoot: @MainActor @Sendable (NavigationRequest) -> Bool
 
     /// - Parameters:
+    ///   - pick: what one entity is called, and the route that picks one; `nil` if the module offers no picker.
     ///   - deepLink: the module's URL grammar; return `nil` for links it doesn't support.
     ///   - toRoot: routes that a deep link hands to the root screen rather than pushing.
     ///   - resolver: builds the screen for one of the module's routes.
     public init<Route: NavigationRoute>(
         _: Route.Type,
+        pick: (title: String, route: Route)? = nil,
         deepLink: @escaping @Sendable (DeepLink) -> Route? = { _ in nil },
         toRoot: @escaping @MainActor @Sendable (Route) -> Bool = { _ in false },
         resolver: @escaping @MainActor @Sendable (Route, NavigationContext) throws -> UIViewController
     ) {
         target = Route.target
         routeType = Route.self
+        picker = pick.map { NavigationPicker(title: $0.title, route: $0.route) }
         self.deepLink = { link in deepLink(link).map { NavigationRequest($0) } }
         deepLinksToRoot = { request in request.route(as: Route.self).map(toRoot) ?? false }
         self.resolver = { request, context in

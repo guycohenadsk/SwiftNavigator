@@ -169,7 +169,7 @@ flowchart TB
 | **NavigationCore** 🍃 | The shared vocabulary: targets, the `NavigationRoute` protocol, requests, results, `Navigator`, `NavigationContext`, registry | Nothing in this package |
 | **NavigatorDependency** | `@Dependency(\.navigator)` and `NavigationContext.child`, for TCA features | `NavigationCore` |
 | **`<X>NavigationContract`** | That module's `target`, its own `Route` enum, and the `Output` values it sends back | `NavigationCore`—imported by module X and by any feature that calls it |
-| **RefPicker** | Shared component: a reference list with **Add Reference**—needs nothing from its host; it lists the modules it can pick from (one per contract it imports), asks which when there are several (`pushForResult`), and each picked `EntityRef` carries the request that opens it, built by its owning module, so hosts implement no routes | `NavigationCore`, `NavigatorDependency`, the contracts it picks from |
+| **RefPicker** | Shared component: a reference list with **Add Reference**—needs nothing from its host; it picks from the modules whose registrations offer a picker (`navigationPickers`), asks which when there are several (`pushForResult`), and each picked `EntityRef` carries the request that opens it, built by its owning module, so hosts implement no routes | `NavigationCore`, `NavigatorDependency` |
 | **Feature** 🧱 | Screens, `route(for:)`, `<X>.navigationRegistration` | `NavigationCore`, `NavigatorDependency` (TCA), `RefPicker`, its own contract, any other module's contract |
 | **App target** 📱 | Which modules and tabs exist, `AppNavigator`, URL handling | Everything (and that's its only job) |
 

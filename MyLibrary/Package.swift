@@ -41,8 +41,6 @@ let package = Package(
             dependencies: [
                 "NavigationCore",
                 "NavigatorDependency",
-                "IssuesNavigationContract",
-                "RFINavigationContract",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]
         ),
@@ -112,8 +110,6 @@ let package = Package(
                 "RefPicker",
                 "NavigationCore",
                 "NavigatorDependency",
-                "IssuesNavigationContract",
-                "RFINavigationContract",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ]
         ),

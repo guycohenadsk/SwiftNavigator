@@ -449,6 +449,13 @@ struct AppCompositionTests {
         #expect(registry.registeredTargets == Set(NavigationTarget.allCases))
     }
 
+    @Test("The registered modules offer Issue and RFI pickers, so the Ref Picker can add both")
+    func pickersOffered() throws {
+        let registry = try AppComposition.makeRegistry()
+        #expect(registry.pickers.map(\.target) == [.issues, .rfi])
+        #expect(registry.pickers.map(\.title) == ["Issue", "RFI"])
+    }
+
     /// The Issues list's own detail needs the list as its parent; IssuesDomainTests cover it.
     @Test("Modules' screens resolve from their requests")
     func innerScreensResolve() throws {
